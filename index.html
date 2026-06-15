@@ -670,16 +670,44 @@ let currentApp = null;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AUTH
+//   -> usamos o Supabase Auth padrão (auth.users) para login/senha,
+//      e a tabela public.app_users só para vincular username -> usuário (perfil).
+//      Isso evita reimplementar hashing de senha no front-end.
 // ═══════════════════════════════════════════════════════════════════════════════
 async function checkUser() {
   const { data: { session } } = await _supabase.auth.getSession();
   if (session && session.user) {
     currentUser = session.user;
+    await ensureAppUserProfile();
     await fetchAllData();
     showSelector();
+    setupRealtime();
   } else {
     currentUser = null;
     showLogin();
+  }
+}
+
+// Garante que existe uma linha em public.app_users vinculada a este usuário
+// (username = parte local do email, ex: "joao" para "joao@blackskull.local")
+async function ensureAppUserProfile() {
+  if (!currentUser) return;
+  const username = (currentUser.email || '').split('@')[0].toLowerCase();
+  try {
+    const { data: existing, error: selErr } = await _supabase
+      .from('app_users')
+      .select('id')
+      .eq('id', currentUser.id)
+      .maybeSingle();
+    if (selErr) console.error('ensureAppUserProfile select:', selErr);
+    if (!existing) {
+      const { error: insErr } = await _supabase
+        .from('app_users')
+        .insert({ id: currentUser.id, username: username, password_hash: 'managed_by_auth' });
+      if (insErr) console.error('ensureAppUserProfile insert:', insErr);
+    }
+  } catch (e) {
+    console.error('ensureAppUserProfile:', e);
   }
 }
 
@@ -748,78 +776,95 @@ async function handleSignUp() {
 
 async function handleLogout() {
   await _supabase.auth.signOut();
-  DB = {}; currentUser = null; showLogin();
+  DB = emptyDB(); currentUser = null; showLogin();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DATABASE
+// DATABASE  (tabela única: public.inventory_records)
+//   app_type     -> 'bebidas' | 'cervejas' | 'alimentos'
+//   week_label   -> 'Semana 1'..'Semana 5'  (estoque)  |  'Minimos'  (valores mínimos)
+//   item_id      -> bebidas: id numérico (string)
+//                    cervejas: "<id>__<local>" (um registro por local) e também "<id>__total" não é usado
+//                              (o total é calculado somando os locais)
+//                    alimentos: nome do item (usado também como item_id)
+//   item_name    -> nome de exibição do item
+//   category_name-> nome da categoria (e para cervejas, também guarda o "local" no caso de Minimos não é necessário)
+//   qty          -> quantidade
+//   min_qty      -> quantidade mínima (só relevante quando week_label = 'Minimos')
 // ═══════════════════════════════════════════════════════════════════════════════
-let DB = {
-  bebidas: { stock: {1:{},2:{},3:{},4:{},5:{}}, mins: {} },
-  cervejas: { stock: {1:{},2:{},3:{},4:{},5:{}}, mins: {} },
-  alimentos: { counts: Array.from({length:5},()=>({})), mins: {} }
-};
+function emptyDB() {
+  return {
+    bebidas: { stock: {1:{},2:{},3:{},4:{},5:{}}, mins: {} },
+    cervejas: { stock: {1:{},2:{},3:{},4:{},5:{}}, mins: {} },
+    alimentos: { counts: Array.from({length:5},()=>({})), mins: {} }
+  };
+}
+let DB = emptyDB();
 
-// CORREÇÃO: todas as queries filtradas por user_id + log de erros
+const WEEK_LABELS = {1:'Semana 1',2:'Semana 2',3:'Semana 3',4:'Semana 4',5:'Semana 5'};
+const MIN_LABEL = 'Minimos';
+
 async function fetchAllData() {
   if (!currentUser) return;
+  DB = emptyDB();
 
-  // BEBIDAS estoque
-  const { data: bStock, error: e1 } = await _supabase
-    .from('estoque_bebidas')
-    .select('semana,item_id,quantidade')
+  const { data: rows, error } = await _supabase
+    .from('inventory_records')
+    .select('app_type,week_label,item_id,item_name,category_name,qty,min_qty')
     .eq('user_id', currentUser.id);
-  if (e1) console.error('fetchAllData estoque_bebidas:', e1);
 
-  // BEBIDAS mínimos
-  const { data: bMins, error: e2 } = await _supabase
-    .from('minimos_bebidas')
-    .select('item_id,minimo_id')
-    .eq('user_id', currentUser.id);
-  if (e2) console.error('fetchAllData minimos_bebidas:', e2);
+  if (error) { console.error('fetchAllData inventory_records:', error); return; }
+  if (!rows) return;
 
-  DB.bebidas.stock = {1:{},2:{},3:{},4:{},5:{}};
-  if (bStock) bStock.forEach(r => { if (DB.bebidas.stock[r.semana]) DB.bebidas.stock[r.semana][r.item_id] = r.quantidade; });
-  DB.bebidas.mins = {};
-  if (bMins) bMins.forEach(r => { DB.bebidas.mins[r.item_id] = r.minimo_id; });
+  rows.forEach(r => {
+    if (r.app_type === 'bebidas') {
+      if (r.week_label === MIN_LABEL) {
+        DB.bebidas.mins[r.item_id] = r.min_qty || 0;
+      } else {
+        const w = weekLabelToNum(r.week_label);
+        if (w && DB.bebidas.stock[w]) DB.bebidas.stock[w][r.item_id] = r.qty || 0;
+      }
+    } else if (r.app_type === 'cervejas') {
+      if (r.week_label === MIN_LABEL) {
+        // item_id aqui é apenas o id do produto (sem local)
+        DB.cervejas.mins[r.item_id] = r.min_qty || 0;
+      } else {
+        const w = weekLabelToNum(r.week_label);
+        if (!w || !DB.cervejas.stock[w]) return;
+        // item_id no formato "<id>__<local>"
+        const parts = String(r.item_id).split('__');
+        const id = parts[0];
+        const loc = parts[1] || 'estoque';
+        if (!DB.cervejas.stock[w][id]) DB.cervejas.stock[w][id] = {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+        DB.cervejas.stock[w][id][loc] = r.qty || 0;
+      }
+    } else if (r.app_type === 'alimentos') {
+      if (r.week_label === MIN_LABEL) {
+        DB.alimentos.mins[r.item_name] = r.min_qty || 0;
+      } else {
+        const w = weekLabelToNum(r.week_label);
+        if (w) { const idx = w - 1; if (idx >= 0 && idx < 5) DB.alimentos.counts[idx][r.item_name] = r.qty || 0; }
+      }
+    }
+  });
+}
 
-  // CERVEJAS estoque
-  const { data: cStock, error: e3 } = await _supabase
-    .from('estoque_cervejas')
-    .select('semana,item_id,locais')
-    .eq('user_id', currentUser.id);
-  if (e3) console.error('fetchAllData estoque_cervejas:', e3);
+function weekLabelToNum(label) {
+  const m = String(label||'').match(/(\d+)/);
+  return m ? parseInt(m[1]) : null;
+}
 
-  // CERVEJAS mínimos
-  const { data: cMins, error: e4 } = await _supabase
-    .from('minimos_cervejas')
-    .select('item_id,minimo')
-    .eq('user_id', currentUser.id);
-  if (e4) console.error('fetchAllData minimos_cervejas:', e4);
-
-  DB.cervejas.stock = {1:{},2:{},3:{},4:{},5:{}};
-  if (cStock) cStock.forEach(r => { if (DB.cervejas.stock[r.semana]) DB.cervejas.stock[r.semana][r.item_id] = r.locais; });
-  DB.cervejas.mins = {};
-  if (cMins) cMins.forEach(r => { DB.cervejas.mins[r.item_id] = r.minimo; });
-
-  // ALIMENTOS estoque
-  const { data: aStock, error: e5 } = await _supabase
-    .from('estoque_alimentos')
-    .select('semana,item_nome,quantidade')
-    .eq('user_id', currentUser.id);
-  if (e5) console.error('fetchAllData estoque_alimentos:', e5);
-
-  // ALIMENTOS mínimos
-  const { data: aMins, error: e6 } = await _supabase
-    .from('minimos_alimentos')
-    .select('item_nome,minimo')
-    .eq('user_id', currentUser.id);
-  if (e6) console.error('fetchAllData minimos_alimentos:', e6);
-
-  DB.alimentos.counts = Array.from({length:5},()=>({}));
-  if (aStock) aStock.forEach(r => { const w = r.semana - 1; if (w >= 0 && w < 5) DB.alimentos.counts[w][r.item_nome] = r.quantidade; });
-  DB.alimentos.mins = {};
-  if (aMins) aMins.forEach(r => { DB.alimentos.mins[r.item_nome] = r.minimo; });
+async function upsertRecord(rec) {
+  // rec: {app_type, week_label, item_id, item_name, category_name, qty, min_qty}
+  const payload = Object.assign({
+    user_id: currentUser.id,
+    qty: 0,
+    min_qty: 0
+  }, rec);
+  const { error } = await _supabase
+    .from('inventory_records')
+    .upsert(payload, { onConflict: 'app_type,week_label,item_id,user_id' });
+  if (error) { console.error('upsertRecord error:', error, payload); showToast('⚠️ Erro ao salvar!'); }
 }
 
 // ─── BEBIDAS helpers ──────────────────────────────────────────────────────────
@@ -828,23 +873,36 @@ async function bSetQty(id, week, val) {
   const v = Math.max(0, val);
   if (!DB.bebidas.stock[week]) DB.bebidas.stock[week] = {};
   DB.bebidas.stock[week][id] = v;
-  const { error } = await _supabase.from('estoque_bebidas')
-    .upsert(
-      { user_id: currentUser.id, semana: week, item_id: id, quantidade: v },
-      { onConflict: 'user_id,semana,item_id' }
-    );
-  if (error) { console.error('bSetQty error:', error); showToast('⚠️ Erro ao salvar!'); }
+  const meta = findBebidaMeta(id);
+  await upsertRecord({
+    app_type: 'bebidas',
+    week_label: WEEK_LABELS[week],
+    item_id: String(id),
+    item_name: meta.nome,
+    category_name: meta.cat,
+    qty: v
+  });
 }
 function bGetMin(id) { return DB.bebidas.mins[id] || 0; }
 async function bSetMin(id, val) {
   const v = Math.max(0, val);
   DB.bebidas.mins[id] = v;
-  const { error } = await _supabase.from('minimos_bebidas')
-    .upsert(
-      { user_id: currentUser.id, item_id: id, minimo_id: v },
-      { onConflict: 'user_id,item_id' }
-    );
-  if (error) { console.error('bSetMin error:', error); showToast('⚠️ Erro ao salvar!'); }
+  const meta = findBebidaMeta(id);
+  await upsertRecord({
+    app_type: 'bebidas',
+    week_label: MIN_LABEL,
+    item_id: String(id),
+    item_name: meta.nome,
+    category_name: meta.cat,
+    min_qty: v
+  });
+}
+function findBebidaMeta(id) {
+  for (const cat of CAT_BEBIDAS) {
+    const it = cat.itens.find(i => String(i.id) === String(id));
+    if (it) return { nome: it.nome, cat: cat.nome };
+  }
+  return { nome: String(id), cat: '' };
 }
 
 // ─── CERVEJAS helpers ──────────────────────────────────────────────────────────
@@ -863,23 +921,39 @@ function cGetTotal(id, week) {
 async function cSetItemData(id, week, data) {
   if (!DB.cervejas.stock[week]) DB.cervejas.stock[week] = {};
   DB.cervejas.stock[week][id] = data;
-  const { error } = await _supabase.from('estoque_cervejas')
-    .upsert(
-      { user_id: currentUser.id, semana: week, item_id: id, locais: data },
-      { onConflict: 'user_id,semana,item_id' }
-    );
-  if (error) { console.error('cSetItemData error:', error); showToast('⚠️ Erro ao salvar!'); }
+  const meta = findCervejaMeta(id);
+  // Salva um registro por local (item_id = "<id>__<local>")
+  for (const loc of LOCAIS) {
+    await upsertRecord({
+      app_type: 'cervejas',
+      week_label: WEEK_LABELS[week],
+      item_id: `${id}__${loc.id}`,
+      item_name: meta.nome,
+      category_name: `${meta.cat} · ${loc.label}`,
+      qty: data[loc.id] || 0
+    });
+  }
 }
 function cGetMin(id) { return DB.cervejas.mins[id] || 0; }
 async function cSetMin(id, val) {
   const v = Math.max(0, val);
   DB.cervejas.mins[id] = v;
-  const { error } = await _supabase.from('minimos_cervejas')
-    .upsert(
-      { user_id: currentUser.id, item_id: id, minimo: v },
-      { onConflict: 'user_id,item_id' }
-    );
-  if (error) { console.error('cSetMin error:', error); showToast('⚠️ Erro ao salvar!'); }
+  const meta = findCervejaMeta(id);
+  await upsertRecord({
+    app_type: 'cervejas',
+    week_label: MIN_LABEL,
+    item_id: String(id),
+    item_name: meta.nome,
+    category_name: meta.cat,
+    min_qty: v
+  });
+}
+function findCervejaMeta(id) {
+  for (const cat of CAT_CERVEJAS) {
+    const it = cat.itens.find(i => String(i.id) === String(id));
+    if (it) return { nome: it.nome, cat: cat.nome };
+  }
+  return { nome: String(id), cat: '' };
 }
 
 // ─── ALIMENTOS helpers ─────────────────────────────────────────────────────────
@@ -887,23 +961,35 @@ function aGetCount(item, w) { return DB.alimentos.counts[w][item] || 0; }
 async function aSetCount(item, w, val) {
   const v = Math.max(0, val);
   DB.alimentos.counts[w][item] = v;
-  const { error } = await _supabase.from('estoque_alimentos')
-    .upsert(
-      { user_id: currentUser.id, semana: w + 1, item_nome: item, quantidade: v },
-      { onConflict: 'user_id,semana,item_nome' }
-    );
-  if (error) { console.error('aSetCount error:', error); showToast('⚠️ Erro ao salvar!'); }
+  const meta = findAlimentoMeta(item);
+  await upsertRecord({
+    app_type: 'alimentos',
+    week_label: WEEK_LABELS[w+1],
+    item_id: item,
+    item_name: item,
+    category_name: meta.cat,
+    qty: v
+  });
 }
 function aGetMin(item) { return DB.alimentos.mins[item] || 0; }
 async function aSetMin(item, val) {
   const v = Math.max(0, val);
   DB.alimentos.mins[item] = v;
-  const { error } = await _supabase.from('minimos_alimentos')
-    .upsert(
-      { user_id: currentUser.id, item_nome: item, minimo: v },
-      { onConflict: 'user_id,item_nome' }
-    );
-  if (error) { console.error('aSetMin error:', error); showToast('⚠️ Erro ao salvar!'); }
+  const meta = findAlimentoMeta(item);
+  await upsertRecord({
+    app_type: 'alimentos',
+    week_label: MIN_LABEL,
+    item_id: item,
+    item_name: item,
+    category_name: meta.cat,
+    min_qty: v
+  });
+}
+function findAlimentoMeta(item) {
+  for (const cat of CAT_ALIMENTOS) {
+    if (cat.items.includes(item)) return { cat: cat.name };
+  }
+  return { cat: '' };
 }
 
 function itemStatus(qty, min) {
@@ -1846,18 +1932,30 @@ function hideModal() { document.getElementById('clearModal').classList.remove('s
 async function clearWeek() {
   hideModal();
   if(currentApp==='bebidas'){
-    DB.bebidas.stock[currentWeek]={};
-    const { error } = await _supabase.from('estoque_bebidas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    const week = currentWeek;
+    DB.bebidas.stock[week]={};
+    const ids = CAT_BEBIDAS.flatMap(cat=>cat.itens.map(it=>String(it.id)));
+    const { error } = await _supabase.from('inventory_records').delete()
+      .match({ user_id: currentUser.id, app_type: 'bebidas', week_label: WEEK_LABELS[week] })
+      .in('item_id', ids);
     if(error) console.error('clearWeek bebidas:', error);
     renderContarBebidas();
   } else if(currentApp==='cervejas'){
-    DB.cervejas.stock[currentWeek]={};
-    const { error } = await _supabase.from('estoque_cervejas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    const week = currentWeek;
+    DB.cervejas.stock[week]={};
+    const itemIds=[];
+    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>LOCAIS.forEach(loc=>itemIds.push(`${it.id}__${loc.id}`))));
+    const { error } = await _supabase.from('inventory_records').delete()
+      .match({ user_id: currentUser.id, app_type: 'cervejas', week_label: WEEK_LABELS[week] })
+      .in('item_id', itemIds);
     if(error) console.error('clearWeek cervejas:', error);
     renderContarCervejas();
   } else if(currentApp==='alimentos'){
     DB.alimentos.counts[foodCurrentWeek]={};
-    const { error } = await _supabase.from('estoque_alimentos').delete().match({user_id:currentUser.id,semana:foodCurrentWeek+1});
+    const items = CAT_ALIMENTOS.flatMap(cat=>cat.items);
+    const { error } = await _supabase.from('inventory_records').delete()
+      .match({ user_id: currentUser.id, app_type: 'alimentos', week_label: WEEK_LABELS[foodCurrentWeek+1] })
+      .in('item_id', items);
     if(error) console.error('clearWeek alimentos:', error);
     refreshFoodDisplays();
   }
@@ -1875,14 +1973,51 @@ function showToast(msg) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// REALTIME — escuta mudanças feitas por outros dispositivos/usuários e atualiza a UI
+// ═══════════════════════════════════════════════════════════════════════════════
+function setupRealtime() {
+  if (!currentUser) return;
+  _supabase
+    .channel('inventory_records_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_records' }, async (payload) => {
+      const row = payload.new || payload.old;
+      if (!row || row.user_id !== currentUser.id) return;
+      await fetchAllData();
+      refreshCurrentView();
+    })
+    .subscribe();
+}
+
+function refreshCurrentView() {
+  if (!currentApp) return;
+  if (currentApp === 'bebidas') {
+    if (currentTab==='contar') renderContarBebidas();
+    else if (currentTab==='resumo') renderResumoBebidas();
+    else if (currentTab==='minimos') renderMinimosBebidas();
+  } else if (currentApp === 'cervejas') {
+    if (currentTab==='contar') renderContarCervejas();
+    else if (currentTab==='resumo') renderResumoCervejas();
+    else if (currentTab==='minimos') renderMinimosCervejas();
+  } else if (currentApp === 'alimentos') {
+    if (foodActiveTab==='contagem') refreshFoodDisplays();
+    else if (foodActiveTab==='resumo') buildFoodResumo();
+    else if (foodActiveTab==='config') buildFoodConfig();
+  } else if (currentApp === 'analytics') {
+    buildAnalyticsBody();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════════════════
 (async()=>{
   const { data: { session } } = await _supabase.auth.getSession();
   if(session && session.user){
     currentUser = session.user;
+    await ensureAppUserProfile();
     await fetchAllData();
     showSelector();
+    setupRealtime();
   } else {
     showLogin();
   }
