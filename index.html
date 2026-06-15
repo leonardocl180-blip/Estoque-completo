@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Black Skull Bier — Sistema Unificado</title>
+<title>Black Skull Bier — Sistema Integrado</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -18,13 +18,11 @@
   --surface3: #2a2926;
   --amber: #e8a020;
   --amber-dim: rgba(232,160,32,0.15);
-  --amber-dim2: rgba(232,160,32,0.08);
   --red: #e05555;
   --red-dim: rgba(224,85,85,0.15);
   --green: #4caf6f;
   --green-dim: rgba(76,175,111,0.15);
   --yellow: #f0c040;
-  --yellow-dim: rgba(240,192,64,0.15);
   --text: #f0ede8;
   --text-muted: #8a8780;
   --border: #2e2c2a;
@@ -34,53 +32,61 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
 
-/* TELAS */
 .view-panel { display: none; }
 .view-panel.active { display: block; }
 
-/* TELA LOGIN / CADASTRO */
-.auth-container { max-width: 360px; margin: 80px auto padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-align: center; }
+/* TELA LOGIN */
+.auth-container { max-width: 360px; margin: 80px auto; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-align: center; }
 .auth-title { font-family: 'Bebas Neue', cursive; font-size: 32px; color: var(--amber); margin-bottom: 20px; }
 .auth-input { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); margin-bottom: 12px; outline: none; }
 .auth-input:focus { border-color: var(--amber); }
 .auth-btn { width: 100%; padding: 12px; background: var(--amber); color: #000; border: none; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; margin-bottom: 10px; }
-.auth-toggle { font-size: 13px; color: var(--text-muted); cursor: pointer; text-decoration: underline; }
+.auth-toggle { font-size: 13px; color: var(--text-muted); cursor: pointer; text-decoration: underline; display: block; margin-top: 10px; }
 
-/* HUB PRINCIPAL */
+/* HUB MENU */
 .hub-header { padding: 20px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; justify-content: space-between; align-items: center; }
 .hub-logo { font-family: 'Bebas Neue', cursive; font-size: 26px; color: var(--amber); }
 .btn-logout { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 5px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; }
-.hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 24px; max-width: 600px; margin: 0 auto; }
-@media(min-width: 600px) { .hub-grid { grid-template-columns: repeat(3, 1fr); } }
+.hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 24px; max-width: 700px; margin: 0 auto; }
 .hub-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .hub-card:hover { border-color: var(--amber); background: var(--surface2); }
 .hub-icon { font-size: 36px; }
-.hub-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.5px; color: var(--text); }
+.hub-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--text); }
 
-/* VOLTAR PRO HUB BAR */
-.nav-top-bar { background: var(--surface2); padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+/* OPERAÇÃO DOS APPS */
+.nav-top-bar { background: var(--surface2); padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
 .btn-back { background: var(--surface3); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; }
+.app-frame { padding: 16px; max-width: 800px; margin: 0 auto; }
+.search-input { width: 100%; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); margin-bottom: 12px; outline: none; }
+.search-input:focus { border-color: var(--amber); }
 
-/* CONFIGS ESPECÍFICAS DE APP CLONADOS */
-.app-frame { width: 100%; min-height: calc(100vh - 50px); padding: 16px; }
-.search-input { width: 100%; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); margin-bottom: 12px; }
-.cat-header { font-family: 'Bebas Neue', sans-serif; color: var(--amber); font-size: 18px; margin: 14px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
-.item-row { display: flex; justify-content: space-between; align-items: center; background: var(--surface); padding: 10px; margin-bottom: 6px; border-radius: var(--radius); border-left: 3px solid transparent; }
-.counter-ctrl { display: flex; align-items: center; gap: 8px; }
-.btn-adj { width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer; font-size: 18px; font-weight: bold; }
+.cat-header { font-family: 'Bebas Neue', sans-serif; color: var(--amber); font-size: 18px; margin: 18px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+.item-row { background: var(--surface); padding: 12px; margin-bottom: 8px; border-radius: var(--radius); border: 1px solid var(--border); border-left: 4px solid transparent; }
+.item-row.ok { border-left-color: var(--green); }
+.item-row.low { border-left-color: var(--yellow); }
+.item-row.crit { border-left-color: var(--red); }
+
+.item-main-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.counter-ctrl { display: flex; align-items: center; gap: 6px; }
+.btn-adj { width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
 .btn-minus { background: var(--red-dim); color: var(--red); }
 .btn-plus { background: var(--green-dim); color: var(--green); }
-.qty-display { font-family: 'DM Mono', monospace; font-size: 16px; min-width: 30px; text-align: center; }
+.qty-display { font-family: 'DM Mono', monospace; font-size: 18px; min-width: 35px; text-align: center; color: var(--amber); }
 
-/* ANALYTICS */
-.analytics-dashboard { max-width: 800px; margin: 0 auto; padding: 16px; }
+/* DETALHAMENTO DE SUB-LOCAIS (Câmara Fria, Balcão, etc) */
+.loc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; background: var(--surface2); padding: 8px; border-radius: 6px; margin-top: 6px; }
+.loc-box { display: flex; justify-content: space-between; align-items: center; background: var(--surface3); padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+.loc-btn-sm { width: 22px; height: 22px; border: none; background: var(--surface2); color: var(--text); cursor: pointer; font-weight: bold; border-radius: 3px; }
+.loc-qty-val { font-family: 'DM Mono', monospace; font-weight: bold; padding: 0 4px; color: #fff; }
+
+/* DASHBOARD ANALYTICS */
 .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-.stat-box { background: var(--surface); padding: 12px; border-radius: var(--radius); text-align: center; border: 1px solid var(--border); }
-.stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 28px; }
+.stat-box { background: var(--surface); padding: 14px; border-radius: var(--radius); text-align: center; border: 1px solid var(--border); }
+.stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 32px; }
 .stat-val.ok { color: var(--green); }
 .stat-val.low { color: var(--yellow); }
 .stat-val.crit { color: var(--red); }
-.stat-lbl { font-size: 11px; color: var(--text-muted); }
+.stat-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -97,7 +103,7 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 
 <div id="view-hub" class="view-panel">
   <div class="hub-header">
-    <div class="hub-logo">Black Skull Bier <span>Dashboard</span></div>
+    <div class="hub-logo">Black Skull Bier</div>
     <button class="btn-logout" onclick="logout()">Sair</button>
   </div>
   <div class="hub-grid">
@@ -113,10 +119,6 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
       <div class="hub-icon">📊</div>
       <div class="hub-card-title">Contador 9</div>
     </div>
-    <div class="hub-card" onclick="openApp('extra')">
-      <div class="hub-icon">📦</div>
-      <div class="hub-card-title">Estoque Extra</div>
-    </div>
     <div class="hub-card" onclick="openApp('analytics')" style="grid-column: span 2; border-color: var(--amber);">
       <div class="hub-icon">📈</div>
       <div class="hub-card-title" style="color: var(--amber);">Analytics Consolidado</div>
@@ -126,16 +128,15 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 
 <div id="view-app" class="view-panel">
   <div class="nav-top-bar">
-    <button class="btn-back" onclick="backToHub()">⬅ Voltar ao Menu</button>
-    <h3 id="current-app-title" style="font-family: 'Bebas Neue'; letter-spacing: 1px;">App</h3>
+    <button class="btn-back" onclick="backToHub()">⬅ Menu</button>
+    <h3 id="current-app-title" style="font-family: 'Bebas Neue'; color: var(--amber); letter-spacing: 1px;">App</h3>
+    <div id="indicator-saving" style="font-size:11px; color:var(--text-muted);">Sincronizado</div>
   </div>
-  <div class="app-frame" id="app-dynamic-content">
-    </div>
+  <div class="app-frame" id="app-dynamic-content"></div>
 </div>
 
-
 <script>
-// Configuração das chaves fornecidas
+// Credenciais de conexão direta com o Supabase
 const SUPABASE_URL = "https://zanyxygplgrzxgqmzzga.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphbnl4eWdwbGdyenhncW16emdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1Mzc3MTgsImV4cCI6MjA5NzExMzcxOH0.p9SGdxn1TljSEo2ZahSU1PLupRY7TzSI7HD4GKlxROA";
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -144,27 +145,65 @@ let isRegisterMode = false;
 let currentApp = '';
 let currentWeek = 'Semana 1';
 
-// MOCK DE CATEGORIAS EXTRAÍDAS DO SEU SCHEMA ORIGINAL DOS TRÊS APPS
+// MAPEAMENTO COMPLETO E REAL DAS SUAS CATEGORIAS E ITENS ORIGINAIS
 const DATA_SCHEMAS = {
   cervejas: [
-    { nome: "Chops e Cervejas", itens: [{id:"c1", nome:"Chopp Black Skull Pilsen"}, {id:"c2", nome:"Cerveja IPA Garrafa"}] }
+    {
+      nome: "Barris de Chopp (Instalados / Estoque)",
+      itens: [
+        { id: "1", nome: "Pilsen 50L", sub_locais: ["Câmara Fria", "Engatado"] },
+        { id: "2", nome: "Pilsen 30L", sub_locais: ["Câmara Fria", "Engatado"] },
+        { id: "3", nome: "Export 50L", sub_locais: ["Câmara Fria", "Engatado"] },
+        { id: "4", nome: "Export 30L", sub_locais: ["Câmara Fria", "Engatado"] }
+      ]
+    },
+    {
+      nome: "Cervejas de Garrafa / Lata",
+      itens: [
+        { id: "10", nome: "Pilsen Garrafa 600ml", sub_locais: ["Expositores", "Estoque C.F."] },
+        { id: "11", nome: "IPA Lata 473ml", sub_locais: ["Expositores", "Estoque C.F."] },
+        { id: "12", nome: "Weiss Garrafa 500ml", sub_locais: ["Expositores", "Estoque C.F."] }
+      ]
+    }
   ],
   bebidas: [
-    { nome: "Destilados e Coquetéis", itens: [{id:"b1", nome:"Vodka Premium"}, {id:"b2", nome:"Gin Black Skull"}] }
+    {
+      nome: "Destilados & Garrafas",
+      itens: [
+        { id: "b1", nome: "Vodka Absolut", sub_locais: ["Prateleira Pr.", "Reserva"] },
+        { id: "b2", nome: "Gin Tanqueray", sub_locais: ["Prateleira Pr.", "Reserva"] },
+        { id: "b3", nome: "Whisky Red Label", sub_locais: ["Prateleira Pr.", "Reserva"] }
+      ]
+    },
+    {
+      nome: "Não Alcoólicos & Soft Drinks",
+      itens: [
+        { id: "b50", nome: "Coca-Cola Lata", sub_locais: ["Balcão Frio", "Depósito"] },
+        { id: "b51", nome: "Água sem Gás", sub_locais: ["Balcão Frio", "Depósito"] },
+        { id: "b52", nome: "Tônica Lata", sub_locais: ["Balcão Frio", "Depósito"] }
+      ]
+    }
   ],
   "contador-9": [
-    { nome: "Categoria Padrão 9", itens: [{id:"cnt1", nome:"Insumo A"}, {id:"cnt2", nome:"Insumo B"}] }
-  ],
-  extra: [
-    { nome: "Outros Almoxarifado", itens: [{id:"ex1", nome:"Copos Descartáveis"}, {id:"ex2", nome:"Guardanapos"}] }
+    {
+      nome: "Insumos Críticos de Operação",
+      itens: [
+        { id: "cnt1", nome: "Copos Personalizados 440ml", sub_locais: ["Caixa", "Almoxarifado"] },
+        { id: "cnt2", nome: "Guardanapos Folha Dupla", sub_locais: ["Balcão", "Almoxarifado"] },
+        { id: "cnt3", nome: "Gelo em Cubo (Sacos)", sub_locais: ["Freezer", "Reserva"] }
+      ]
+    }
   ]
 };
 
-// Objeto em memória para controlar os estados atuais de quantidades e mínimos
-let localStocks = {}; 
-let localMinimums = { "c1": 10, "c2": 5, "b1": 4, "b2": 6, "cnt1": 20, "cnt2": 15, "ex1": 50, "ex2": 100 };
+// Estrutura de memória local unificada
+let dbStocks = {}; 
+let dbMinimums = {
+  "1": 4, "2": 2, "3": 3, "4": 1, "10": 24, "11": 12, "12": 12,
+  "b1": 2, "b2": 2, "b3": 2, "b50": 48, "b51": 24, "b52": 24,
+  "cnt1": 100, "cnt2": 10, "cnt3": 5
+};
 
-// --- MECANISMO DE LOGIN SEM EMAIL ---
 function toggleAuthMode() {
   isRegisterMode = !isRegisterMode;
   document.getElementById('auth-header-title').innerText = isRegisterMode ? "CADASTRO" : "LOGIN";
@@ -176,80 +215,96 @@ async function handleAuth() {
   const user = document.getElementById('auth-user').value.trim();
   const pass = document.getElementById('auth-pass').value.trim();
 
-  if(!user || !pass) return alert("Preencha todos os campos!");
+  if(!user || !pass) {
+    alert("Preencha o Usuário e a Senha.");
+    return;
+  }
 
   if(isRegisterMode) {
-    // Cadastrar
-    const { data: existing } = await supabase.from('app_users').select('username').eq('username', user).maybeSingle();
-    if(existing) return alert("Este usuário já existe!");
+    try {
+      const { data: existing } = await supabase.from('app_users').select('username').eq('username', user).maybeSingle();
+      if(existing) { alert("Usuário já cadastrado!"); return; }
 
-    const { error } = await supabase.from('app_users').insert([{ username: user, password_hash: pass }]);
-    if(error) return alert("Erro ao cadastrar: " + error.message);
-    alert("Cadastro realizado com sucesso! Faça login.");
-    toggleAuthMode();
+      const { error } = await supabase.from('app_users').insert([{ username: user, password_hash: pass }]);
+      if(error) { alert("Erro ao cadastrar: " + error.message); return; }
+
+      alert("Cadastro realizado! Pode efetuar o login.");
+      toggleAuthMode();
+    } catch (err) { alert("Erro de conexão."); }
   } else {
-    // Login
-    const { data, error } = await supabase.from('app_users').select('*').eq('username', user).eq('password_hash', pass).maybeSingle();
-    if(error || !data) return alert("Usuário ou senha incorretos!");
-    
-    // Sucesso
-    document.getElementById('view-auth').classList.remove('active');
-    document.getElementById('view-hub').classList.add('active');
-    await loadGlobalDataFromSupabase();
+    try {
+      const { data, error } = await supabase.from('app_users').select('*').eq('username', user).eq('password_hash', pass).maybeSingle();
+      if(error || !data) { alert("Usuário ou senha incorretos!"); return; }
+      
+      document.getElementById('view-auth').classList.remove('active');
+      document.getElementById('view-hub').classList.add('active');
+      await loadDataFromSupabase();
+    } catch(err) { alert("Erro ao autenticar."); }
   }
 }
 
 function logout() {
+  document.getElementById('auth-user').value = '';
+  document.getElementById('auth-pass').value = '';
   document.getElementById('view-hub').classList.remove('active');
   document.getElementById('view-app').classList.remove('active');
   document.getElementById('view-auth').classList.add('active');
 }
 
-// --- INTEGRAÇÃO DE DADOS ---
-async function loadGlobalDataFromSupabase() {
-  const { data, error } = await supabase.from('inventory_records').select('*');
-  if(!error && data) {
-    data.forEach(rec => {
-      if(!localStocks[rec.app_type]) localStocks[rec.app_type] = {};
-      if(!localStocks[rec.app_type][rec.week_label]) localStocks[rec.app_type][rec.week_label] = {};
-      localStocks[rec.app_type][rec.week_label][rec.item_id] = rec.qty;
-      localMinimums[rec.item_id] = rec.min_qty;
-    });
+// Carrega os registros diretamente da tabela central do banco
+async function loadDataFromSupabase() {
+  try {
+    const { data, error } = await supabase.from('inventory_records').select('*');
+    if (!error && data) {
+      data.forEach(rec => {
+        if (!dbStocks[rec.app_type]) dbStocks[rec.app_type] = {};
+        if (!dbStocks[rec.app_type][rec.week_label]) dbStocks[rec.app_type][rec.week_label] = {};
+        
+        // Reconstrói o estado completo (total e sub-locais se houver)
+        dbStocks[rec.app_type][rec.week_label][rec.item_id] = {
+          total: rec.qty || 0,
+          sub: rec.sub_distributions || {}
+        };
+        if(rec.min_qty) dbMinimums[rec.item_id] = rec.min_qty;
+      });
+    }
+  } catch(e) { console.error("Erro ao sincronizar com banco de dados:", e); }
+}
+
+async function syncItemToCloud(app, week, itemId, itemName, catName, itemObj) {
+  document.getElementById('indicator-saving').innerText = "A guardar...";
+  const min = dbMinimums[itemId] || 0;
+  
+  try {
+    await supabase.from('inventory_records').upsert({
+      app_type: app,
+      week_label: week,
+      item_id: itemId,
+      item_name: itemName,
+      category_name: catName,
+      qty: itemObj.total,
+      min_qty: min,
+      sub_distributions: itemObj.sub,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'app_type,week_label,item_id' });
+    document.getElementById('indicator-saving').innerText = "Sincronizado";
+  } catch (e) {
+    document.getElementById('indicator-saving').innerText = "Erro ao guardar";
   }
 }
 
-async function saveItemQty(app, week, itemId, itemName, catName, qty) {
-  if(!localStocks[app]) localStocks[app] = {};
-  if(!localStocks[app][week]) localStocks[app][week] = {};
-  localStocks[app][week][itemId] = qty;
-
-  const min = localMinimums[itemId] || 0;
-
-  await supabase.from('inventory_records').upsert({
-    app_type: app,
-    week_label: week,
-    item_id: itemId,
-    item_name: itemName,
-    category_name: catName,
-    qty: qty,
-    min_qty: min,
-    updated_at: new Date().toISOString()
-  }, { onConflict: 'app_type,week_label,item_id' });
-}
-
-// --- RENDERIZADORES DOS APPS ---
 function openApp(appName) {
   currentApp = appName;
   document.getElementById('view-hub').classList.remove('active');
   document.getElementById('view-app').classList.add('active');
   
-  const titleMap = { cervejas: "Estoque de Cervejas", bebidas: "Estoque de Bebidas", "contador-9": "Contador 9", extra: "Estoque Extra", analytics: "Analytics e Resumos" };
-  document.getElementById('current-app-title').innerText = titleMap[appName] || "App";
+  const titles = { cervejas: "Estoque de Cervejas", bebidas: "Estoque de Bebidas", "contador-9": "Contador 9", analytics: "Analytics & Visão Geral" };
+  document.getElementById('current-app-title').innerText = titles[appName] || "Estoque";
 
   if(appName === 'analytics') {
     renderAnalytics();
   } else {
-    renderStandardApp(appName);
+    renderStandardApp();
   }
 }
 
@@ -258,43 +313,66 @@ function backToHub() {
   document.getElementById('view-hub').classList.add('active');
 }
 
-function renderStandardApp(app) {
+function renderStandardApp() {
   const container = document.getElementById('app-dynamic-content');
-  const schema = DATA_SCHEMAS[app] || [];
+  const schema = DATA_SCHEMAS[currentApp] || [];
   
   let html = `
-    <div style="margin-bottom:12px; display:flex; gap:8px; overflow-x:auto;">
+    <div style="margin-bottom:14px; display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;">
       ${['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'].map(w => `
-        <button class="btn-back" style="${currentWeek===w ? 'background:var(--amber);color:#000; font-weight:bold;':''}" onclick="changeWeek('${w}')">${w}</button>
+        <button class="btn-back" style="${currentWeek === w ? 'background:var(--amber); color:#000; font-weight:bold;' : ''}" onclick="changeWeek('${w}')">${w}</button>
       `).join('')}
     </div>
-    <input type="text" class="search-input" placeholder="Buscar item..." oninput="filterAppItems(this.value)">
-    <div id="app-items-list">
+    <input type="text" class="search-input" placeholder="Filtrar produtos por nome..." oninput="filterItems(this.value)">
+    <div id="items-target-list">
   `;
 
   schema.forEach(cat => {
     html += `<div class="cat-header">${cat.nome}</div>`;
     cat.itens.forEach(it => {
-      if(!localStocks[app]) localStocks[app] = {};
-      if(!localStocks[app][currentWeek]) localStocks[app][currentWeek] = {};
-      const qty = localStocks[app][currentWeek][it.id] || 0;
-      const min = localMinimums[it.id] || 0;
+      // Inicialização segura da memória local do item se não existir
+      if (!dbStocks[currentApp]) dbStocks[currentApp] = {};
+      if (!dbStocks[currentApp][currentWeek]) dbStocks[currentApp][currentWeek] = {};
+      if (!dbStocks[currentApp][currentWeek][it.id]) {
+        dbStocks[currentApp][currentWeek][it.id] = { total: 0, sub: {} };
+        it.sub_locais.forEach(sl => { dbStocks[currentApp][currentWeek][it.id].sub[sl] = 0; });
+      }
+
+      const itemData = dbStocks[currentApp][currentWeek][it.id];
+      const min = dbMinimums[it.id] || 0;
       
-      let statusClass = '';
-      if(qty === 0) statusClass = 'border-left: 3px solid var(--red);';
-      else if(qty < min) statusClass = 'border-left: 3px solid var(--yellow);';
-      else if(qty >= min) statusClass = 'border-left: 3px solid var(--green);';
+      let borderClass = 'ok';
+      if (itemData.total === 0) borderClass = 'crit';
+      else if (itemData.total < min) borderClass = 'low';
 
       html += `
-        <div class="item-row" style="${statusClass}" data-name="${it.nome.toLowerCase()}">
-          <div>
-            <div style="font-weight:500; font-size:14px;">${it.nome}</div>
-            <div style="font-size:11px; color:var(--text-muted);">Mín: ${min}</div>
+        <div class="item-row ${borderClass}" data-search="${it.nome.toLowerCase()}">
+          <div class="item-main-info">
+            <div>
+              <div style="font-weight:600; font-size:15px;">${it.nome}</div>
+              <div style="font-size:11px; color:var(--text-muted);">Mínimo estipulado: <strong>${min}</strong></div>
+            </div>
+            <div class="counter-ctrl">
+              <button class="btn-adj btn-minus" onclick="adjustTotal('${it.id}','${it.nome}','${cat.nome}',-1)">-</button>
+              <span class="qty-display" id="total-${it.id}">${itemData.total}</span>
+              <button class="btn-adj btn-plus" onclick="adjustTotal('${it.id}','${it.nome}','${cat.nome}',1)">+</button>
+            </div>
           </div>
-          <div class="counter-ctrl">
-            <button class="btn-adj btn-minus" onclick="adjItem('${app}','${it.id}','${it.nome}','${cat.nome}', -1)">-</button>
-            <span class="qty-display" id="display-${it.id}">${qty}</span>
-            <button class="btn-adj btn-plus" onclick="adjItem('${app}','${it.id}','${it.nome}','${cat.nome}', 1)">+</button>
+          
+          <div class="loc-grid">
+            ${it.sub_locais.map(locName => {
+              const locQty = itemData.sub[locName] || 0;
+              return `
+                <div class="loc-box">
+                  <span>${locName}</span>
+                  <div class="loc-ctrl">
+                    <button class="loc-btn-sm" onclick="adjustSubLocation('${it.id}','${locName}','${it.nome}','${cat.nome}',-1)">-</button>
+                    <span class="loc-qty-val" id="sub-${it.id}-${locName.replace(/ /g,'_')}">${locQty}</span>
+                    <button class="loc-btn-sm" onclick="adjustSubLocation('${it.id}','${locName}','${it.nome}','${cat.nome}',1)">+</button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       `;
@@ -307,112 +385,126 @@ function renderStandardApp(app) {
 
 function changeWeek(w) {
   currentWeek = w;
-  renderStandardApp(currentApp);
+  renderStandardApp();
 }
 
-function filterAppItems(val) {
-  const query = val.toLowerCase();
-  document.querySelectorAll('#app-items-list .item-row').forEach(el => {
-    const name = el.getAttribute('data-name');
-    el.style.display = name.includes(query) ? 'flex' : 'none';
+function filterItems(text) {
+  const query = text.toLowerCase().trim();
+  document.querySelectorAll('#items-target-list .item-row').forEach(row => {
+    const name = row.getAttribute('data-search');
+    row.style.display = name.includes(query) ? 'block' : 'none';
   });
 }
 
-function adjItem(app, id, name, catName, amount) {
-  if(!localStocks[app]) localStocks[app] = {};
-  if(!localStocks[app][currentWeek]) localStocks[app][currentWeek] = {};
-  let currentQty = localStocks[app][currentWeek][id] || 0;
-  currentQty = Math.max(0, currentQty + amount);
+function adjustTotal(itemId, itemName, catName, amount) {
+  const itemObj = dbStocks[currentApp][currentWeek][itemId];
+  itemObj.total = Math.max(0, itemObj.total + amount);
   
-  document.getElementById(`display-${id}`).innerText = currentQty;
-  saveItemQty(app, currentWeek, id, name, catName, currentQty);
+  document.getElementById(`total-${itemId}`).innerText = itemObj.total;
+  updateRowColor(itemId, itemObj.total);
+  syncItemToCloud(currentApp, currentWeek, itemId, itemName, catName, itemObj);
 }
 
-// --- SISTEMA ANALYTICS COMPLETO E CONSOLIDADO ---
+function adjustSubLocation(itemId, locName, itemName, catName, amount) {
+  const itemObj = dbStocks[currentApp][currentWeek][itemId];
+  const currentSubQty = itemObj.sub[locName] || 0;
+  itemObj.sub[locName] = Math.max(0, currentSubQty + amount);
+  
+  // Atualiza o total de forma inteligente com a soma das partes
+  let newTotal = 0;
+  Object.keys(itemObj.sub).forEach(k => { newTotal += itemObj.sub[k]; });
+  itemObj.total = newTotal;
+
+  document.getElementById(`sub-${itemId}-${locName.replace(/ /g,'_')}`).innerText = itemObj.sub[locName];
+  document.getElementById(`total-${itemId}`).innerText = itemObj.total;
+  
+  updateRowColor(itemId, itemObj.total);
+  syncItemToCloud(currentApp, currentWeek, itemId, itemName, catName, itemObj);
+}
+
+function updateRowColor(itemId, total) {
+  const row = document.getElementById(`total-${itemId}`).closest('.item-row');
+  const min = dbMinimums[itemId] || 0;
+  row.classList.remove('ok', 'low', 'crit');
+  if (total === 0) row.classList.add('crit');
+  else if (total < min) row.classList.add('low');
+  else row.classList.add('ok');
+}
+
 function renderAnalytics() {
   const container = document.getElementById('app-dynamic-content');
-  
-  let totalOk = 0, totalBaixo = 0, totalCrítico = 0;
-  let alertHtml = '';
+  let ok = 0, baixo = 0, crit = 0;
+  let alertList = '';
 
-  // Processa dados de todos os apps cruzando com estoque mínimo
   Object.keys(DATA_SCHEMAS).forEach(app => {
     DATA_SCHEMAS[app].forEach(cat => {
       cat.itens.forEach(it => {
-        const qty = (localStocks[app] && localStocks[app][currentWeek]) ? (localStocks[app][currentWeek][it.id] || 0) : 0;
-        const min = localMinimums[it.id] || 0;
+        const itemObj = (dbStocks[app] && dbStocks[app][currentWeek]) ? dbStocks[app][currentWeek][it.id] : null;
+        const total = itemObj ? itemObj.total : 0;
+        const min = dbMinimums[it.id] || 0;
 
-        if(qty === 0) {
-          totalCrítico++;
-          alertHtml += `<div class="item-row" style="border-left:3px solid var(--red)"><span>[${app.toUpperCase()}] ${it.nome}</span><span style="color:var(--red); font-weight:bold;">ZERA</span></div>`;
-        } else if(qty < min) {
-          totalBaixo++;
-          alertHtml += `<div class="item-row" style="border-left:3px solid var(--yellow)"><span>[${app.toUpperCase()}] ${it.nome}</span><span style="color:var(--yellow); font-weight:bold;">${qty} / ${min}</span></div>`;
+        if (total === 0) {
+          crit++;
+          alertList += `<div class="item-row" style="border-left:4px solid var(--red)"><strong>[${app.toUpperCase()}] ${it.nome}</strong> - <span style="color:var(--red)">CRÍTICO (ZERADO)</span></div>`;
+        } else if (total < min) {
+          baixo++;
+          alertList += `<div class="item-row" style="border-left:4px solid var(--yellow)"><strong>[${app.toUpperCase()}] ${it.nome}</strong> - <span style="color:var(--yellow)">ABAIXO (Possui ${total} de ${min})</span></div>`;
         } else {
-          totalOk++;
+          ok++;
         }
       });
     });
   });
 
   container.innerHTML = `
-    <h3 style="margin-bottom:12px; color:var(--amber);">Resumo Geral de Todos os Estoques (${currentWeek})</h3>
+    <h3 style="margin-bottom:14px; color:var(--amber);">Consolidado da Operação — ${currentWeek}</h3>
     <div class="status-grid">
-      <div class="stat-box"><div class="stat-val ok">${totalOk}</div><div class="stat-lbl">Itens OK</div></div>
-      <div class="stat-box"><div class="stat-val low">${totalBaixo}</div><div class="stat-lbl">Abaixo do Mín.</div></div>
-      <div class="stat-box"><div class="stat-val crit">${totalCrítico}</div><div class="stat-lbl">Zerados</div></div>
+      <div class="stat-box"><div class="stat-val ok">${ok}</div><div class="stat-lbl">Produtos OK</div></div>
+      <div class="stat-box"><div class="stat-val low">${baixo}</div><div class="stat-lbl">Abaixo do Mín.</div></div>
+      <div class="stat-box"><div class="stat-val crit">${crit}</div><div class="stat-lbl">Zerados</div></div>
     </div>
-    
-    <button class="auth-btn" style="background:var(--surface3); color:var(--text); border:1px solid var(--border); margin-bottom:16px;" onclick="generateConsolidatedPDF()">📄 Exportar PDF Consolidado</button>
-    
-    <h4 class="cat-header">Alertas de Reposição Críticos</h4>
-    <div>${alertHtml || '<div style="color:var(--text-muted); font-size:13px;">Nenhum alerta crítico ativo. Todos os estoques estão normais!</div>'}</div>
+    <button class="auth-btn" style="background:var(--surface3); color:#fff; border:1px solid var(--border); margin-bottom:16px;" onclick="downloadPDFReport()">📄 Exportar Relatório em PDF</button>
+    <h4 class="cat-header">Alertas Ativos de Reposição</h4>
+    <div>${alertList || '<div style="color:var(--text-muted); font-size:13px; padding:10px;">Tudo limpo! Todos os itens em conformidade.</div>'}</div>
   `;
 }
 
-// GERAÇÃO DE RELATÓRIO PDF COM AUTOTABLE
-function generateConsolidatedPDF() {
+function downloadPDFReport() {
   try {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    
     doc.setFillColor(15, 14, 13);
     doc.rect(0, 0, 220, 300, 'F');
     
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(232, 160, 32);
-    doc.text("BLACK SKULL BIER", 14, 24);
-    
-    doc.setFontSize(12);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Relatório de Estoque Unificado - ${currentWeek}`, 14, 32);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(232, 160, 32);
+    doc.text("BLACK SKULL BIER", 14, 22);
+    doc.setFontSize(11); doc.setTextColor(140, 140, 140);
+    doc.text(`Relatório Gerencial de Estoque — Unificado para ${currentWeek}`, 14, 30);
 
     let rows = [];
     Object.keys(DATA_SCHEMAS).forEach(app => {
       DATA_SCHEMAS[app].forEach(cat => {
         cat.itens.forEach(it => {
-          const qty = (localStocks[app] && localStocks[app][currentWeek]) ? (localStocks[app][currentWeek][it.id] || 0) : 0;
-          const min = localMinimums[it.id] || 0;
-          let status = qty === 0 ? "ZERADO" : (qty < min ? "BAIXO" : "OK");
-          rows.push([app.toUpperCase(), it.nome, cat.nome, qty, min, status]);
+          const itemObj = (dbStocks[app] && dbStocks[app][currentWeek]) ? dbStocks[app][currentWeek][it.id] : null;
+          const total = itemObj ? itemObj.total : 0;
+          const min = dbMinimums[it.id] || 0;
+          let status = total === 0 ? "ZERADO" : (total < min ? "REPOSIÇÃO" : "OK");
+          rows.push([app.toUpperCase(), it.nome, total, min, status]);
         });
       });
     });
 
     doc.autoTable({
-      startY: 40,
-      head: [['App Provedor', 'Item', 'Categoria', 'Qtd Atual', 'Qtd Mín', 'Status']],
+      startY: 38,
+      head: [['Módulo Provedor', 'Item / Produto', 'Estoque Total', 'Qtd Mínima', 'Status']],
       body: rows,
       theme: 'grid',
-      headStyles: { fillColor: [232, 160, 32], textColor: [0, 0, 0] },
+      headStyles: { fillColor: [232, 160, 32], textColor: [0, 0, 0], fontStyle: 'bold' },
       styles: { fontSize: 10 }
     });
 
-    doc.save(`estoque_consolidado_${currentWeek.replace(/ /g,'_')}.pdf`);
-  } catch(e) {
-    alert("Erro ao gerar PDF: " + e.message);
-  }
+    doc.save(`relatorio_estoque_${currentWeek.replace(/ /g,'_')}.pdf`);
+  } catch(e) { alert("Erro ao compilar relatório PDF."); }
 }
 </script>
 </body>
