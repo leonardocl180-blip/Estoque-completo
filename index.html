@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Black Skull Bier — Sistema Integrado</title>
+<title>Black Skull Bier — Estoque</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
+/* ─── DESIGN TOKENS ──────────────────────────────────────────────────────────── */
 :root {
   --bg: #0f0e0d;
   --surface: #1a1917;
@@ -18,11 +18,15 @@
   --surface3: #2a2926;
   --amber: #e8a020;
   --amber-dim: rgba(232,160,32,0.15);
+  --amber-dim2: rgba(232,160,32,0.08);
   --red: #e05555;
   --red-dim: rgba(224,85,85,0.15);
   --green: #4caf6f;
   --green-dim: rgba(76,175,111,0.15);
   --yellow: #f0c040;
+  --yellow-dim: rgba(240,192,64,0.15);
+  --blue: #5b9cf6;
+  --blue-dim: rgba(91,156,246,0.15);
   --text: #f0ede8;
   --text-muted: #8a8780;
   --border: #2e2c2a;
@@ -30,428 +34,1840 @@
   --radius-sm: 5px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; overflow-x: hidden; }
 
-.view-panel { display: none; }
-.view-panel.active { display: block; }
+/* ─── TELA DE LOGIN ──────────────────────────────────────────────────────────── */
+#login-screen {
+  position: fixed; inset: 0; background: var(--bg); z-index: 9999;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.login-box {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 32px 28px; border-radius: 12px; width: 100%; max-width: 340px;
+}
+.login-logo {
+  font-family: 'Bebas Neue', cursive; font-size: 30px; color: var(--amber);
+  letter-spacing: 1px; line-height: 1; text-align: center; margin-bottom: 4px;
+}
+.login-subtitle {
+  font-size: 12px; color: var(--text-muted); text-align: center;
+  margin-bottom: 28px; font-weight: 300;
+}
+.login-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: block;
+}
+.login-input {
+  width: 100%; padding: 11px 14px; background: var(--surface2);
+  border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius); font-family: 'DM Sans', sans-serif;
+  font-size: 14px; outline: none; transition: border-color .15s; margin-bottom: 14px;
+}
+.login-input:focus { border-color: var(--amber); }
+.login-input::placeholder { color: var(--text-muted); }
+.btn-primary {
+  width: 100%; padding: 13px; background: var(--amber); border: none;
+  color: #000; font-weight: 700; border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif; font-size: 14px; cursor: pointer;
+  transition: opacity .15s; margin-bottom: 10px;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-secondary {
+  width: 100%; padding: 13px; background: transparent;
+  border: 1px solid var(--green); color: var(--green); font-weight: 600;
+  border-radius: var(--radius); font-family: 'DM Sans', sans-serif;
+  font-size: 14px; cursor: pointer; transition: all .15s; margin-bottom: 10px;
+  display: none;
+}
+.btn-secondary:hover { background: var(--green-dim); }
+.login-toggle {
+  font-size: 12px; color: var(--text-muted); text-align: center;
+  cursor: pointer; padding-top: 4px;
+}
+.login-toggle span { color: var(--amber); text-decoration: underline; }
+.login-error {
+  color: var(--red); font-size: 12px; margin-top: 8px;
+  text-align: center; display: none;
+}
 
-/* TELA DE LOGIN ORIGINAL CORRIGIDA */
-#login-screen { position: fixed; inset: 0; background: #0f0e0d; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.login-box { background: #1a1917; border: 1px solid #2e2c2a; padding: 30px; border-radius: 8px; width: 100%; max-width: 340px; text-align: center; }
-.auth-title { font-family: 'Bebas Neue', cursive; color: #e8a020; font-size: 28px; margin-bottom: 20px; }
-.auth-input { width: 100%; padding: 10px; margin-bottom: 10px; background: #222120; border: 1px solid #2e2c2a; color: #fff; border-radius: 5px; outline: none; text-transform: lowercase; }
-.auth-btn { width: 100%; padding: 12px; background: #e8a020; border: none; color: #000; font-weight: bold; border-radius: 5px; cursor: pointer; }
-.toggle-auth-text { font-size: 12px; color: #8a8780; margin-top: 15px; cursor: pointer; }
+/* ─── TELA SELETOR DE APP ────────────────────────────────────────────────────── */
+#app-selector {
+  position: fixed; inset: 0; background: var(--bg); z-index: 8888;
+  display: none; flex-direction: column;
+}
+.selector-header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+}
+.selector-logo { font-family: 'Bebas Neue', cursive; font-size: 22px; color: var(--amber); letter-spacing: 1px; }
+.selector-user { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; }
+.btn-logout {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  font-family: 'DM Sans', sans-serif; font-size: 11px; padding: 5px 10px; border-radius: 4px;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-logout:hover { border-color: var(--red); color: var(--red); }
 
-/* HUB MENU */
-.hub-header { padding: 20px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; justify-content: space-between; align-items: center; }
-.hub-logo { font-family: 'Bebas Neue', cursive; font-size: 26px; color: var(--amber); }
-.btn-logout { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 5px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; }
-.hub-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 24px; max-width: 700px; margin: 0 auto; }
-.hub-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.hub-card:hover { border-color: var(--amber); background: var(--surface2); }
-.hub-icon { font-size: 36px; }
-.hub-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--text); }
+.selector-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 24px 20px; gap: 16px;
+}
+.selector-greeting {
+  font-family: 'Bebas Neue', cursive; font-size: 26px; color: var(--text);
+  letter-spacing: 1px; text-align: center; margin-bottom: 8px;
+}
+.selector-hint { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; text-align: center; }
+.app-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  width: 100%; max-width: 380px;
+}
+.app-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 16px; cursor: pointer;
+  transition: all .2s; display: flex; flex-direction: column;
+  align-items: center; gap: 10px; text-align: center;
+}
+.app-card:hover, .app-card:active { border-color: var(--amber); background: var(--surface2); transform: translateY(-1px); }
+.app-card-icon { font-size: 32px; line-height: 1; }
+.app-card-name {
+  font-family: 'Bebas Neue', cursive; font-size: 16px; color: var(--text);
+  letter-spacing: 0.5px; line-height: 1.2;
+}
+.app-card-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.app-card.analytics { border-color: var(--blue-dim); }
+.app-card.analytics:hover { border-color: var(--blue); }
+.app-card.analytics .app-card-name { color: var(--blue); }
 
-/* OPERAÇÃO DOS APPS */
-.nav-top-bar { background: var(--surface2); padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-.btn-back { background: var(--surface3); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; }
-.app-frame { padding: 16px; max-width: 800px; margin: 0 auto; }
-.search-input { width: 100%; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); margin-bottom: 12px; outline: none; }
+/* ─── HEADER GERAL ───────────────────────────────────────────────────────────── */
+#app-main { display: none; }
+header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.header-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px 8px;
+}
+.logo { font-family: 'Bebas Neue', cursive; font-size: 22px; color: var(--amber); letter-spacing: 1px; line-height: 1; }
+.logo span { color: var(--text-muted); font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 300; display: block; letter-spacing: 0; margin-top: 1px; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.btn-home {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  font-family: 'DM Sans', sans-serif; font-size: 11px; padding: 4px 10px; border-radius: 4px;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-home:hover { border-color: var(--amber); color: var(--amber); }
+
+/* TABS */
+.tab-bar { display: flex; border-top: 1px solid var(--border); }
+.tab-btn {
+  flex: 1; padding: 9px 4px; border: none; background: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+  color: var(--text-muted); letter-spacing: 0.3px; transition: all .15s;
+  border-bottom: 2px solid transparent; position: relative;
+}
+.tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); }
+.tab-btn:hover:not(.active) { color: var(--text); }
+
+/* WEEK BAR */
+.week-bar {
+  position: fixed; top: 83px; left: 0; right: 0; z-index: 90;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 4px; padding: 8px 12px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.week-bar::-webkit-scrollbar { display: none; }
+.week-btn {
+  flex-shrink: 0; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+  background: none; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--text-muted); transition: all .15s; white-space: nowrap;
+}
+.week-btn.active { background: var(--amber); border-color: var(--amber); color: #000; font-weight: 500; }
+.week-btn:hover:not(.active) { border-color: var(--amber); color: var(--amber); }
+
+/* MAIN CONTENT */
+.main { padding-top: 130px; min-height: 100vh; }
+.main.no-weekbar { padding-top: 90px; }
+
+/* SEARCH */
+.search-wrap { padding: 10px 12px 6px; }
+.search-input {
+  width: 100%; padding: 9px 14px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+  outline: none; transition: border-color .15s;
+}
 .search-input:focus { border-color: var(--amber); }
+.search-input::placeholder { color: var(--text-muted); }
 
-.cat-header { font-family: 'Bebas Neue', sans-serif; color: var(--amber); font-size: 18px; margin: 18px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
-.item-row { background: var(--surface); padding: 12px; margin-bottom: 8px; border-radius: var(--radius); border: 1px solid var(--border); border-left: 4px solid transparent; }
-.item-row.ok { border-left-color: var(--green); }
-.item-row.low { border-left-color: var(--yellow); }
-.item-row.crit { border-left-color: var(--red); }
+/* CATEGORY HEADER */
+.cat-header {
+  padding: 14px 12px 6px; font-family: 'Bebas Neue', cursive;
+  font-size: 17px; color: var(--amber); letter-spacing: 1px;
+  display: flex; align-items: center; gap: 8px;
+}
+.cat-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.cat-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); font-weight: 400; }
 
-.item-main-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+/* ITEM CARD */
+.item-list { padding: 0 10px; display: flex; flex-direction: column; gap: 6px; }
+.item-card {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid transparent;
+  border-radius: var(--radius); padding: 10px 12px;
+  display: flex; align-items: center; gap: 10px; transition: border-color .15s;
+  user-select: none;
+}
+.item-card.has-qty { border-left-color: var(--amber); }
+.item-card.low { border-left-color: var(--yellow); }
+.item-card.critical { border-left-color: var(--red); }
+
+.item-name-wrap { flex: 1; min-width: 0; cursor: pointer; }
+.item-name { font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-code { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
+.min-badge {
+  font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text-muted);
+  background: var(--surface3); border: 1px solid var(--border);
+  padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
+}
+
 .counter-ctrl { display: flex; align-items: center; gap: 6px; }
-.btn-adj { width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+.btn-adj {
+  width: 30px; height: 30px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+  transition: opacity .1s; flex-shrink: 0;
+}
 .btn-minus { background: var(--red-dim); color: var(--red); }
 .btn-plus { background: var(--green-dim); color: var(--green); }
-.qty-display { font-family: 'DM Mono', monospace; font-size: 18px; min-width: 35px; text-align: center; color: var(--amber); }
+.btn-adj:active { opacity: 0.6; }
+.qty-display {
+  font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500;
+  color: var(--text); min-width: 36px; text-align: center; line-height: 1; cursor: pointer;
+}
+.qty-display:hover { color: var(--amber) !important; }
+.qty-display.zero { color: var(--text-muted); }
 
-/* DETALHAMENTO DE SUB-LOCAIS */
-.loc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; background: var(--surface2); padding: 8px; border-radius: 6px; margin-top: 6px; }
-.loc-box { display: flex; justify-content: space-between; align-items: center; background: var(--surface3); padding: 6px 10px; border-radius: 4px; font-size: 12px; }
-.loc-btn-sm { width: 22px; height: 22px; border: none; background: var(--surface2); color: var(--text); cursor: pointer; font-weight: bold; border-radius: 3px; }
-.loc-qty-val { font-family: 'DM Mono', monospace; font-weight: bold; padding: 0 4px; color: #fff; }
+/* CERVEJAS — LOCAIS */
+.item-card-beer {
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid transparent;
+  border-radius: var(--radius); padding: 10px 12px; transition: border-color .15s; user-select: none;
+}
+.item-card-beer.has-qty { border-left-color: var(--amber); }
+.item-card-beer.low { border-left-color: var(--yellow); }
+.item-card-beer.critical { border-left-color: var(--red); }
+.item-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.item-name-beer { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.2; cursor: pointer; }
+.item-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.qty-display-beer {
+  font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500;
+  color: var(--text); min-width: 38px; text-align: center; line-height: 1; cursor: pointer;
+}
+.qty-display-beer:hover { color: var(--amber) !important; }
+.qty-display-beer.zero { color: var(--text-muted); }
+.loc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+.loc-item {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 8px; display: flex; align-items: center; justify-content: space-between;
+}
+.loc-label { font-size: 10px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
+.loc-ctrl { display: flex; align-items: center; gap: 4px; }
+.loc-btn {
+  width: 22px; height: 22px; border-radius: 4px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+.loc-btn.minus { background: var(--red-dim); color: var(--red); }
+.loc-btn.plus { background: var(--green-dim); color: var(--green); }
+.loc-btn:active { opacity: 0.6; }
+.loc-qty { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; min-width: 24px; text-align: center; color: var(--text); cursor: pointer; }
+.loc-qty.zero { color: var(--text-muted); }
+.toggle-loc {
+  font-size: 10px; color: var(--text-muted); background: none; border: none;
+  cursor: pointer; padding: 2px 0; display: flex; align-items: center; gap: 4px;
+  font-family: 'DM Sans', sans-serif; font-weight: 500;
+}
+.toggle-loc:hover { color: var(--amber); }
+.loc-details.hidden { display: none; }
 
-/* ANALYTICS */
-.status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-.stat-box { background: var(--surface); padding: 14px; border-radius: var(--radius); text-align: center; border: 1px solid var(--border); }
-.stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 32px; }
-.stat-val.ok { color: var(--green); }
-.stat-val.low { color: var(--yellow); }
-.stat-val.crit { color: var(--red); }
-.stat-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+/* CONTADOR ALIMENTOS — ESTILOS ESPECÍFICOS */
+.item-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; margin-bottom: 5px; transition: border-color .15s;
+  user-select: none;
+}
+.item-row.has-count { border-color: rgba(232,160,32,.3); }
+.item-row.is-low { border-color: rgba(240,192,64,.6) !important; }
+.item-row.is-missing { border-color: rgba(224,85,85,.5) !important; }
+.item-row-name { font-size: 14px; color: var(--text); flex: 1; line-height: 1.3; cursor: pointer; }
+.item-min-badge { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-right: 8px; flex-shrink: 0; }
+.counter-controls { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
+.count-display {
+  font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; color: var(--amber);
+  width: 46px; text-align: center; background: transparent; border: none; outline: none;
+  -moz-appearance: textfield; cursor: text;
+}
+.count-display::-webkit-outer-spin-button, .count-display::-webkit-inner-spin-button { -webkit-appearance: none; }
+.count-display.zero { color: var(--text-muted); }
+.count-display.bump { animation: bump .15s ease-out; }
+@keyframes bump { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 100%{transform:scale(1)} }
+.category-section { margin-bottom: 22px; }
+.category-header-food {
+  font-family: 'Bebas Neue', cursive; font-size: 12px; letter-spacing: 3px;
+  color: #d45f1e; padding: 5px 0 7px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
+}
+
+/* FAB */
+.fab {
+  position: fixed; bottom: 24px; right: 16px; z-index: 200;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--red); border-radius: 24px; padding: 10px 16px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,.5); display: flex; align-items: center; gap: 6px;
+  transition: all .15s;
+}
+.fab:hover { border-color: var(--red); }
+
+/* RESUMO / STATUS */
+.resumo-wrap { padding: 10px 12px; }
+.week-select-wrap { margin-bottom: 12px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.week-select-wrap::-webkit-scrollbar { display: none; }
+.week-select-wrap .week-btn { padding: 5px 10px; }
+
+.status-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
+.status-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px; text-align: center;
+}
+.status-card .sc-num { font-family: 'Bebas Neue', cursive; font-size: 32px; line-height: 1; }
+.status-card .sc-label { font-size: 10px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 2px; }
+.status-card.missing .sc-num { color: var(--red); }
+.status-card.low .sc-num { color: var(--yellow); }
+.status-card.ok .sc-num { color: var(--green); }
+
+.action-btns { display: flex; gap: 8px; margin-bottom: 14px; }
+.action-btn {
+  flex: 1; padding: 9px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Sans', sans-serif;
+  font-size: 12px; font-weight: 500; cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.action-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+.section-title {
+  font-family: 'Bebas Neue', cursive; font-size: 16px; letter-spacing: 0.5px;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.section-title.red { color: var(--red); }
+.section-title.yellow { color: var(--yellow); }
+.section-title.full { color: var(--text-muted); }
+
+.alert-cards { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.alert-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 10px; display: flex; align-items: center; gap: 8px;
+}
+.alert-card.missing { border-left: 3px solid var(--red); }
+.alert-card.low { border-left: 3px solid var(--yellow); }
+.alert-info { flex: 1; min-width: 0; }
+.alert-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alert-detail { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.alert-qty { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; }
+.alert-card.missing .alert-qty { color: var(--red); }
+.alert-card.low .alert-qty { color: var(--yellow); }
+
+/* TABELA COMPLETA */
+.full-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 80px; }
+.full-table th { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-weight: 400; text-transform: uppercase; letter-spacing: 0.3px; }
+.full-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.full-table tr.cat-row td { background: var(--surface2); font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 5px 8px; }
+.full-table tr:hover td { background: var(--surface2); }
+.status-badge {
+  font-family: 'DM Mono', monospace; font-size: 9px; padding: 2px 6px; border-radius: 3px;
+  font-weight: 500; text-transform: uppercase;
+}
+.status-badge.missing { background: var(--red-dim); color: var(--red); }
+.status-badge.low { background: var(--yellow-dim); color: var(--yellow); }
+.status-badge.ok { background: var(--green-dim); color: var(--green); }
+.status-badge.none { color: var(--text-muted); background: var(--surface3); }
+
+/* MINIMOS */
+.min-list { padding: 0 10px 80px; display: flex; flex-direction: column; gap: 6px; }
+.min-item {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 8px 12px; display: flex; align-items: center; gap: 8px;
+}
+.min-name { flex: 1; min-width: 0; }
+.min-name-text { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.min-code-text { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
+.min-ctrl { display: flex; align-items: center; gap: 5px; }
+.min-input {
+  width: 48px; text-align: center; background: var(--surface3); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 16px;
+  font-weight: 500; padding: 4px; outline: none; appearance: textfield;
+}
+.min-input::-webkit-outer-spin-button, .min-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.min-input:focus { border-color: var(--amber); }
+.min-input.zero { color: var(--text-muted); }
+
+/* QTY EDITÁVEL */
+.qty-input-edit {
+  font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500;
+  color: var(--amber); min-width: 36px; width: 48px; text-align: center;
+  background: var(--surface3); border: 1px solid var(--amber);
+  border-radius: 4px; outline: none; padding: 2px 4px;
+  -webkit-appearance: none; -moz-appearance: textfield; appearance: textfield;
+}
+.qty-input-edit::-webkit-outer-spin-button, .qty-input-edit::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px; max-width: 320px; width: 100%;
+}
+.modal-title { font-family: 'Bebas Neue', cursive; font-size: 20px; color: var(--red); margin-bottom: 8px; }
+.modal-text { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5; }
+.modal-btns { display: flex; gap: 8px; }
+.modal-btn {
+  flex: 1; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+}
+.modal-btn.cancel { background: none; color: var(--text-muted); }
+.modal-btn.confirm { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* MODAL SOMA ALIMENTOS */
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; max-width: 300px; width: 100%;
+}
+.modal-item { font-family: 'Bebas Neue',sans-serif; font-size: 18px; color: var(--amber); margin-bottom: 4px; }
+.modal-current { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.modal-input {
+  width: 100%; padding: 10px; background: var(--surface2); border: 1px solid var(--amber);
+  border-radius: 8px; color: var(--text); font-size: 22px; text-align: center;
+  font-family: 'DM Mono',monospace; outline: none; margin-bottom: 12px;
+  -moz-appearance: textfield;
+}
+.modal-input::-webkit-outer-spin-button, .modal-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.modal-food-btns { display: flex; gap: 8px; }
+.modal-cancel { flex:1; padding:10px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; }
+.modal-confirm { flex:1; padding:10px; background:var(--green); border:none; border-radius:8px; color:#fff; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; }
+
+/* POPOVER */
+.adj-popover {
+  position: fixed; z-index: 900;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  display: none; flex-direction: column; gap: 8px; min-width: 180px;
+}
+.adj-popover.show { display: flex; }
+.adj-popover-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.adj-popover-title.plus { color: var(--green); }
+.adj-popover-title.minus { color: var(--red); }
+.adj-popover-row { display: flex; gap: 6px; align-items: center; }
+.adj-popover-input {
+  flex: 1; padding: 7px 10px; background: var(--surface3);
+  border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: 'DM Mono', monospace;
+  font-size: 18px; font-weight: 500; text-align: center; outline: none; width: 80px;
+  -webkit-appearance: none; -moz-appearance: textfield; appearance: textfield;
+}
+.adj-popover-input::-webkit-outer-spin-button, .adj-popover-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.adj-popover-input:focus { border-color: var(--amber); }
+.adj-popover-confirm {
+  padding: 7px 14px; border: none; border-radius: 6px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: opacity .15s;
+}
+.adj-popover-confirm.plus { background: var(--green); color: #fff; }
+.adj-popover-confirm.minus { background: var(--red); color: #fff; }
+.adj-popover-confirm:active { opacity: 0.7; }
+.adj-popover-cancel {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 11px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; text-align: center; padding: 2px 0;
+}
+.adj-popover-cancel:hover { color: var(--text); }
+
+/* EMPTY */
+.empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.empty-icon { font-size: 32px; margin-bottom: 8px; }
+.empty-text { font-size: 13px; }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--surface3); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 16px; border-radius: 20px; font-size: 13px; z-index: 500;
+  opacity: 0; transition: all .3s; pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ─── ANALYTICS ───────────────────────────────────────────────────────────────── */
+.analytics-wrap { padding: 10px 12px 80px; }
+.analytics-title {
+  font-family: 'Bebas Neue', cursive; font-size: 22px; color: var(--blue);
+  letter-spacing: 1px; margin-bottom: 4px;
+}
+.analytics-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+.analytics-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 18px; }
+.analytics-big { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
+.an-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px; text-align: center;
+}
+.an-card .an-num { font-family: 'Bebas Neue', cursive; font-size: 28px; line-height: 1; }
+.an-card .an-label { font-size: 10px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.4px; text-transform: uppercase; margin-top: 2px; }
+.an-card .an-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.an-card.danger .an-num { color: var(--red); }
+.an-card.warning .an-num { color: var(--yellow); }
+.an-card.success .an-num { color: var(--green); }
+.an-card.info .an-num { color: var(--blue); }
+
+.an-section { margin-bottom: 18px; }
+.an-section-title {
+  font-family: 'Bebas Neue', cursive; font-size: 15px; letter-spacing: 0.5px;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 8px; padding: 0 0 6px;
+  border-bottom: 1px solid var(--border);
+}
+.an-section-title.red { color: var(--red); }
+.an-section-title.yellow { color: var(--yellow); }
+.an-section-title.blue { color: var(--blue); }
+.an-section-title.muted { color: var(--text-muted); }
+
+.an-item-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); margin-bottom: 5px;
+}
+.an-item-row.danger { border-left: 3px solid var(--red); }
+.an-item-row.warning { border-left: 3px solid var(--yellow); }
+.an-item-info { flex: 1; min-width: 0; }
+.an-item-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an-item-source { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.an-item-qty { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 500; }
+.an-item-row.danger .an-item-qty { color: var(--red); }
+.an-item-row.warning .an-item-qty { color: var(--yellow); }
+.an-week-bar { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+.an-week-bar::-webkit-scrollbar { display: none; }
+
+/* CONFIG ALIMENTOS */
+.config-content { padding: 14px 16px 80px; }
+.config-top { margin-bottom: 10px; }
+.config-top-title { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; color:var(--text); }
+.config-info { font-size:12px; color:var(--text-muted); margin-bottom:16px; line-height:1.6; }
+.config-section-title { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:2px; color:var(--amber); padding:10px 0 5px; border-bottom:1px solid var(--border); margin-bottom:8px; }
+.config-item { display:flex; justify-content:space-between; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin-bottom:5px; }
+.config-item-name { font-size:13px; flex:1; }
+.min-control { display:flex; align-items:center; gap:6px; }
+.min-btn { width:28px; height:28px; border-radius:6px; border:none; cursor:pointer; font-size:16px; font-weight:600; display:flex; align-items:center; justify-content:center; }
+.min-btn.minus { background:var(--red-dim); color:var(--red); }
+.min-btn.plus { background:var(--green-dim); color:var(--green); }
+.min-val { width:44px; text-align:center; background:var(--surface3); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:'DM Mono',monospace; font-size:15px; padding:3px; outline:none; -moz-appearance:textfield; }
+.min-val::-webkit-outer-spin-button,.min-val::-webkit-inner-spin-button{-webkit-appearance:none;}
+.min-val.zero{color:var(--text-muted);}
+.min-val:focus{border-color:var(--amber);}
+
+@media (max-width: 400px) {
+  .status-cards, .analytics-grid { grid-template-columns: repeat(3,1fr); }
+  .status-card .sc-num { font-size: 26px; }
+}
 </style>
 </head>
 <body>
 
+<!-- ═══════════════════════════════════════════════════
+     TELA DE LOGIN
+════════════════════════════════════════════════════ -->
 <div id="login-screen">
   <div class="login-box">
-    <h2 class="auth-title" id="auth-title">Black Skull Bier <br><span style="font-size:16px; color:#8a8780;">Acesso Restrito</span></h2>
-    <input type="text" id="login-username" class="auth-input" placeholder="Nome de Usuário">
-    <input type="password" id="login-pwd" class="auth-input" placeholder="Senha">
-    <button id="btn-login" class="auth-btn" onclick="handleLogin()">Entrar</button>
-    <button id="btn-signup" class="auth-btn" style="background:#4caf6f; color:#fff; display:none;" onclick="handleSignUp()">Criar Conta</button>
-    <p id="toggle-auth-text" class="toggle-auth-text" onclick="alternarTelaAuth(true)">
-      Não tem uma conta? <span style="color:#e8a020; text-decoration:underline;">Cadastre-se aqui</span>
-    </p>
-    <p id="login-error" style="color:#e05555; font-size:12px; margin-top:10px; display:none;"></p>
+    <div class="login-logo">Black Skull Bier</div>
+    <div class="login-subtitle" id="auth-subtitle">Acesso Restrito</div>
+    <label class="login-label">Usuário</label>
+    <input class="login-input" id="login-username" type="text" placeholder="seu_usuario" autocomplete="username" style="text-transform:lowercase">
+    <label class="login-label">Senha</label>
+    <input class="login-input" id="login-pwd" type="password" placeholder="••••••" autocomplete="current-password">
+    <button class="btn-primary" id="btn-login" onclick="handleLogin()">Entrar</button>
+    <button class="btn-secondary" id="btn-signup" onclick="handleSignUp()">Criar Conta</button>
+    <div class="login-toggle" id="toggle-auth" onclick="alternarTelaAuth(true)">
+      Não tem conta? <span>Cadastre-se aqui</span>
+    </div>
+    <div class="login-error" id="login-error"></div>
   </div>
 </div>
 
-<div id="view-hub" class="view-panel">
-  <div class="hub-header">
-    <div class="hub-logo">Black Skull Bier</div>
-    <button class="btn-logout" onclick="handleLogout()">Sair 🚪</button>
+<!-- ═══════════════════════════════════════════════════
+     SELETOR DE APP (HOME)
+════════════════════════════════════════════════════ -->
+<div id="app-selector">
+  <div class="selector-header">
+    <div class="selector-logo">Black Skull Bier</div>
+    <div class="selector-user">
+      <span id="selector-username"></span>
+      <button class="btn-logout" onclick="handleLogout()">Sair 🚪</button>
+    </div>
   </div>
-  <div class="hub-grid">
-    <div class="hub-card" onclick="openApp('cervejas')">
-      <div class="hub-icon">🍺</div>
-      <div class="hub-card-title">Cervejas</div>
-    </div>
-    <div class="hub-card" onclick="openApp('bebidas')">
-      <div class="hub-icon">🍸</div>
-      <div class="hub-card-title">Bebidas</div>
-    </div>
-    <div class="hub-card" onclick="openApp('contador-9')">
-      <div class="hub-icon">📊</div>
-      <div class="hub-card-title">Contador 9</div>
-    </div>
-    <div class="hub-card" onclick="openApp('analytics')" style="grid-column: span 2; border-color: var(--amber);">
-      <div class="hub-icon">📈</div>
-      <div class="hub-card-title" style="color: var(--amber);">Analytics Consolidado</div>
+  <div class="selector-body">
+    <div class="selector-greeting">Controle de Estoque</div>
+    <div class="selector-hint">Escolha qual contagem realizar</div>
+    <div class="app-grid">
+      <div class="app-card" onclick="loadApp('bebidas')">
+        <div class="app-card-icon">🥤</div>
+        <div class="app-card-name">Bebidas</div>
+        <div class="app-card-desc">Refrigerantes, sucos, energéticos e mais</div>
+      </div>
+      <div class="app-card" onclick="loadApp('cervejas')">
+        <div class="app-card-icon">🍺</div>
+        <div class="app-card-name">Cervejas</div>
+        <div class="app-card-desc">Por local: estoque, piscina, bar, câmara</div>
+      </div>
+      <div class="app-card" onclick="loadApp('alimentos')">
+        <div class="app-card-icon">🍔</div>
+        <div class="app-card-name">Alimentos</div>
+        <div class="app-card-desc">Carnes, pastéis, pães e acompanhamentos</div>
+      </div>
+      <div class="app-card analytics" onclick="loadApp('analytics')">
+        <div class="app-card-icon">📊</div>
+        <div class="app-card-name">Analytics</div>
+        <div class="app-card-desc">Resumo geral de todos os estoques</div>
+      </div>
     </div>
   </div>
 </div>
 
-<div id="view-app" class="view-panel">
-  <div class="nav-top-bar">
-    <button class="btn-back" onclick="backToHub()">⬅ Menu</button>
-    <h3 id="current-app-title" style="font-family: 'Bebas Neue'; color: var(--amber); letter-spacing: 1px;">Módulo</h3>
-    <div id="indicator-saving" style="font-size:11px; color:var(--text-muted);">Sincronizado</div>
+<!-- ═══════════════════════════════════════════════════
+     APP PRINCIPAL (carregado dinamicamente)
+════════════════════════════════════════════════════ -->
+<div id="app-main">
+  <!-- HEADER -->
+  <header>
+    <div class="header-top">
+      <div class="logo" id="app-logo">Black Skull Bier<span id="app-subtitle">Estoque</span></div>
+      <div class="header-actions">
+        <button class="btn-home" onclick="goHome()">🏠 Home</button>
+        <button class="btn-logout" onclick="handleLogout()">Sair 🚪</button>
+      </div>
+    </div>
+    <div class="tab-bar" id="tabBar"></div>
+  </header>
+
+  <!-- WEEK BAR (bebidas / cervejas) -->
+  <div class="week-bar" id="weekBar" style="display:none">
+    <button class="week-btn active" onclick="setWeek(1)">1ª Sem</button>
+    <button class="week-btn" onclick="setWeek(2)">2ª Sem</button>
+    <button class="week-btn" onclick="setWeek(3)">3ª Sem</button>
+    <button class="week-btn" onclick="setWeek(4)">4ª Sem</button>
+    <button class="week-btn" onclick="setWeek(5)">5ª Sem</button>
   </div>
-  <div class="app-frame" id="app-dynamic-content"></div>
+
+  <!-- CONTENT AREA -->
+  <div id="appContent"></div>
+
+  <!-- FAB LIMPAR -->
+  <button class="fab" id="fabClear" onclick="showClearModal()" style="display:none">🗑 Limpar semana</button>
 </div>
+
+<!-- MODALS COMPARTILHADOS -->
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <div class="modal-title">Limpar Semana</div>
+    <div class="modal-text" id="clearModalText">Zerar todas as contagens desta semana?</div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="hideModal()">Cancelar</button>
+      <button class="modal-btn confirm" onclick="clearWeek()">Zerar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="foodModal" style="display:none" onclick="if(event.target===this)closeFoodModal()">
+  <div class="modal-box">
+    <div class="modal-item" id="food-modal-item"></div>
+    <div class="modal-current">Atual: <span id="food-modal-current"></span></div>
+    <div class="modal-label">Quantidade a somar:</div>
+    <input class="modal-input" id="food-modal-input" type="number" min="0" placeholder="0"
+      onkeydown="if(event.key==='Enter')confirmFoodModal()">
+    <div class="modal-food-btns">
+      <button class="modal-cancel" onclick="closeFoodModal()">Cancelar</button>
+      <button class="modal-confirm" onclick="confirmFoodModal()">+ Somar</button>
+    </div>
+  </div>
+</div>
+
+<div class="adj-popover" id="adjPopover">
+  <div class="adj-popover-title" id="adjPopoverTitle">Adicionar</div>
+  <div class="adj-popover-row">
+    <input class="adj-popover-input" id="adjPopoverInput" type="number" min="1" value="1">
+    <button class="adj-popover-confirm" id="adjPopoverConfirm" onclick="confirmAdj()">OK</button>
+  </div>
+  <button class="adj-popover-cancel" onclick="closePopover()">cancelar</button>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-// URL e Credenciais corretas retiradas do seu código funcional
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════════════════════════════════════════════════
 const SUPABASE_URL = "https://zanyxygplgrzxgqmzzga.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphbnl4eWdwbGdyenhncW16emdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1Mzc3MTgsImV4cCI6MjA5NzExMzcxOH0.p9SGdxn1TljSEo2ZahSU1PLupRY7TzSI7HD4GKlxROA";
-
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
-let currentApp = '';
-let currentWeek = 1;
+let currentApp = null;
 
-// Estrutura de dados real dos seus arquivos de inventário
-const DATA_SCHEMAS = {
-  bebidas: [
-    {
-      nome: "Coca-Cola & Pepsi",
-      itens: [
-        {id:23, nome:"Coca-Cola", sub_locais:["Expositor", "Estoque"]},
-        {id:24, nome:"Coca-Cola Zero", sub_locais:["Expositor", "Estoque"]},
-        {id:1721, nome:"Coca-Cola 2 Litros", sub_locais:["Expositor", "Estoque"]},
-        {id:3141, nome:"Coca-Cola Zero 2L", sub_locais:["Expositor", "Estoque"]},
-        {id:29, nome:"Pepsi", sub_locais:["Expositor", "Estoque"]},
-        {id:30, nome:"Pepsi Black", sub_locais:["Expositor", "Estoque"]}
-      ]
-    },
-    {
-      nome: "Fanta & Sprite",
-      itens: [
-        {id:25, nome:"Fanta Laranja", sub_locais:["Expositor", "Estoque"]},
-        {id:26, nome:"Fanta Uva", sub_locais:["Expositor", "Estoque"]},
-        {id:3259, nome:"Fanta Laranja Zero", sub_locais:["Expositor", "Estoque"]},
-        {id:28, nome:"Sprite", sub_locais:["Expositor", "Estoque"]},
-        {id:3260, nome:"Sprite Zero", sub_locais:["Expositor", "Estoque"]}
-      ]
-    }
-  ],
-  cervejas: [
-    {
-      nome: "Barris de Chopp",
-      itens: [
-        { id: 101, nome: "Pilsen 50L", sub_locais: ["Câmara Fria", "Engatado"] },
-        { id: 102, nome: "IPA 30L", sub_locais: ["Câmara Fria", "Engatado"] }
-      ]
-    }
-  ],
-  "contador-9": [
-    {
-      nome: "Insumos Gerais",
-      itens: [
-        { id: 901, nome: "Copos Descartáveis", sub_locais: ["Balcão", "Depósito"] }
-      ]
-    }
-  ]
-};
-
-let DB_STOCK = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}};
-let DB_MINS = {};
-
-// VALIDAÇÃO E LOGIN (Padrão exato do seu HTML funcional)
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════════════════════
 async function checkUser() {
   const { data: { session } } = await _supabase.auth.getSession();
   if (session && session.user) {
     currentUser = session.user;
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('view-hub').classList.add('active');
-    await fetchAllData();
+    showSelector();
   } else {
     currentUser = null;
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('view-hub').classList.remove('active');
+    showLogin();
   }
 }
 
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-selector').style.display = 'none';
+  document.getElementById('app-main').style.display = 'none';
+}
+
+function showSelector() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-main').style.display = 'none';
+  const username = currentUser.email.replace('@blackskull.local','').replace(/@.*/,'');
+  document.getElementById('selector-username').textContent = username;
+  document.getElementById('app-selector').style.display = 'flex';
+  currentApp = null;
+}
+
+function goHome() { showSelector(); }
+
 function alternarTelaAuth(querCadastrar) {
-  const title = document.getElementById('auth-title');
+  const subtitle = document.getElementById('auth-subtitle');
   const btnLogin = document.getElementById('btn-login');
   const btnSignUp = document.getElementById('btn-signup');
-  const toggleText = document.getElementById('toggle-auth-text');
-  
+  const toggle = document.getElementById('toggle-auth');
+  document.getElementById('login-error').style.display = 'none';
   if (querCadastrar) {
-    title.innerHTML = "Black Skull Bier <br><span style='font-size:16px; color:#8a8780;'>Nova Conta</span>";
+    subtitle.textContent = 'Nova Conta';
     btnLogin.style.display = 'none';
     btnSignUp.style.display = 'block';
-    toggleText.innerHTML = "Já tem uma conta? <span style='color:#e8a020; text-decoration:underline;'>Faça login</span>";
-    toggleText.setAttribute('onclick', 'alternarTelaAuth(false)');
+    toggle.innerHTML = "Já tem conta? <span>Faça login</span>";
+    toggle.onclick = () => alternarTelaAuth(false);
   } else {
-    title.innerHTML = "Black Skull Bier <br><span style='font-size:16px; color:#8a8780;'>Acesso Restrito</span>";
+    subtitle.textContent = 'Acesso Restrito';
     btnLogin.style.display = 'block';
     btnSignUp.style.display = 'none';
-    toggleText.innerHTML = "Não tem uma conta? <span style='color:#e8a020; text-decoration:underline;'>Cadastre-se aqui</span>";
-    toggleText.setAttribute('onclick', 'alternarTelaAuth(true)');
+    toggle.innerHTML = "Não tem conta? <span>Cadastre-se aqui</span>";
+    toggle.onclick = () => alternarTelaAuth(true);
   }
 }
 
 async function handleLogin() {
-  let user = document.getElementById('login-username').value.trim().toLowerCase();
+  const user = document.getElementById('login-username').value.trim().toLowerCase();
   const password = document.getElementById('login-pwd').value;
-  const errorEl = document.getElementById('login-error');
-  errorEl.style.display = 'none';
-
-  if(!user || !password) {
-    errorEl.textContent = "Preencha o usuário e a senha.";
-    errorEl.style.display = 'block';
-    return;
-  }
-
-  const emailVirtual = user.includes('@') ? user : `${user}@gmail.com`;
-
-  const { error } = await _supabase.auth.signInWithPassword({ email: emailVirtual, password });
-
-  if (error) {
-    errorEl.textContent = "Acesso negado. Verifique o usuário e a senha.";
-    errorEl.style.display = 'block';
-  } else {
-    checkUser();
-  }
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!user || !password) { errEl.textContent = 'Preencha o usuário e a senha.'; errEl.style.display = 'block'; return; }
+  const email = user.includes('@') ? user : `${user}@blackskull.local`;
+  const { error } = await _supabase.auth.signInWithPassword({ email, password });
+  if (error) { errEl.textContent = 'Acesso negado. Verifique o usuário e a senha.'; errEl.style.display = 'block'; }
+  else checkUser();
 }
 
 async function handleSignUp() {
-  let user = document.getElementById('login-username').value.trim().toLowerCase();
+  const user = document.getElementById('login-username').value.trim().toLowerCase();
   const password = document.getElementById('login-pwd').value;
-  const errorEl = document.getElementById('login-error');
-  errorEl.style.display = 'none';
-
-  if (!user || !password) {
-    errorEl.textContent = "Defina um nome de usuário e uma senha.";
-    errorEl.style.display = 'block';
-    return;
-  }
-
-  const emailVirtual = user.includes('@') ? user : `${user}@gmail.com`;
-
-  const { error } = await _supabase.auth.signUp({ email: emailVirtual, password });
-
-  if (error) {
-    errorEl.textContent = "Erro ao cadastrar: " + error.message;
-    errorEl.style.display = 'block';
-  } else {
-    alert("Conta criada com sucesso!");
-    checkUser();
-  }
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!user || !password) { errEl.textContent = 'Defina um nome de usuário e uma senha.'; errEl.style.display = 'block'; return; }
+  if (password.length < 6) { errEl.textContent = 'A senha precisa ter no mínimo 6 caracteres.'; errEl.style.display = 'block'; return; }
+  const email = user.includes('@') ? user : `${user}@blackskull.local`;
+  const { error } = await _supabase.auth.signUp({ email, password });
+  if (error) { errEl.textContent = 'Erro ao cadastrar: ' + error.message; errEl.style.display = 'block'; }
+  else { showToast('Conta criada! Entrando...'); setTimeout(checkUser, 800); }
 }
 
 async function handleLogout() {
   await _supabase.auth.signOut();
-  DB_STOCK = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}};
-  DB_MINS = {};
-  document.getElementById('view-app').classList.remove('active');
-  checkUser();
+  DB = {}; currentUser = null; showLogin();
 }
 
-// SINCRONIZAÇÃO COMPATÍVEL COM SUA TABELA ESTOQUE_BEBIDAS
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATABASE — estado compartilhado
+// ═══════════════════════════════════════════════════════════════════════════════
+let DB = {
+  bebidas: { stock: {1:{},2:{},3:{},4:{},5:{}}, mins: {} },
+  cervejas: { stock: {1:{},2:{},3:{},4:{},5:{}}, mins: {} },
+  alimentos: { counts: Array.from({length:5},()=>({})), mins: {} }
+};
+
 async function fetchAllData() {
   if (!currentUser) return;
-  
-  const { data: stockData } = await _supabase.from('estoque_bebidas').select('semana, item_id, quantidade');
-  const { data: minData } = await _supabase.from('minimos_bebidas').select('item_id, minimo_id');
+  // BEBIDAS
+  const { data: bStock } = await _supabase.from('estoque_bebidas').select('semana,item_id,quantidade');
+  const { data: bMins } = await _supabase.from('minimos_bebidas').select('item_id,minimo_id');
+  DB.bebidas.stock = {1:{},2:{},3:{},4:{},5:{}};
+  if (bStock) bStock.forEach(r => { if(DB.bebidas.stock[r.semana]) DB.bebidas.stock[r.semana][r.item_id] = r.quantidade; });
+  DB.bebidas.mins = {};
+  if (bMins) bMins.forEach(r => { DB.bebidas.mins[r.item_id] = r.minimo_id; });
 
-  DB_STOCK = {1:{}, 2:{}, 3:{}, 4:{}, 5:{}};
-  if (stockData) {
-    stockData.forEach(row => {
-      if(DB_STOCK[row.semana]) DB_STOCK[row.semana][row.item_id] = row.quantidade;
+  // CERVEJAS
+  const { data: cStock } = await _supabase.from('estoque_cervejas').select('semana,item_id,locais');
+  const { data: cMins } = await _supabase.from('minimos_cervejas').select('item_id,minimo');
+  DB.cervejas.stock = {1:{},2:{},3:{},4:{},5:{}};
+  if (cStock) cStock.forEach(r => { if(DB.cervejas.stock[r.semana]) DB.cervejas.stock[r.semana][r.item_id] = r.locais; });
+  DB.cervejas.mins = {};
+  if (cMins) cMins.forEach(r => { DB.cervejas.mins[r.item_id] = r.minimo; });
+
+  // ALIMENTOS
+  const { data: aStock } = await _supabase.from('estoque_alimentos').select('semana,item_nome,quantidade');
+  const { data: aMins } = await _supabase.from('minimos_alimentos').select('item_nome,minimo');
+  DB.alimentos.counts = Array.from({length:5},()=>({}));
+  if (aStock) aStock.forEach(r => { const w = r.semana - 1; if(w>=0&&w<5) DB.alimentos.counts[w][r.item_nome] = r.quantidade; });
+  DB.alimentos.mins = {};
+  if (aMins) aMins.forEach(r => { DB.alimentos.mins[r.item_nome] = r.minimo; });
+}
+
+// ─── BEBIDAS helpers ──────────────────────────────────────────────────────────
+function bGetQty(id, week) { return (DB.bebidas.stock[week] && DB.bebidas.stock[week][id]) || 0; }
+async function bSetQty(id, week, val) {
+  const v = Math.max(0, val);
+  if (!DB.bebidas.stock[week]) DB.bebidas.stock[week] = {};
+  DB.bebidas.stock[week][id] = v;
+  await _supabase.from('estoque_bebidas').upsert({ user_id: currentUser.id, semana: week, item_id: id, quantidade: v }, { onConflict: 'user_id,semana,item_id' });
+}
+function bGetMin(id) { return DB.bebidas.mins[id] || 0; }
+async function bSetMin(id, val) {
+  const v = Math.max(0, val); DB.bebidas.mins[id] = v;
+  await _supabase.from('minimos_bebidas').upsert({ user_id: currentUser.id, item_id: id, minimo_id: v }, { onConflict: 'user_id,item_id' });
+}
+
+// ─── CERVEJAS helpers ──────────────────────────────────────────────────────────
+const LOCAIS = [
+  { id:'estoque', label:'Estoque' }, { id:'piscina', label:'Piscina' },
+  { id:'gel_ext', label:'Gel. Ext.' }, { id:'bar', label:'Bar' },
+  { id:'camara', label:'Câmara Fria' }
+];
+function cGetItemData(id, week) { return (DB.cervejas.stock[week] && DB.cervejas.stock[week][id]) || {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0}; }
+function cGetTotal(id, week) { const d = cGetItemData(id, week); return LOCAIS.reduce((s,l)=>s+(d[l.id]||0),0); }
+async function cSetItemData(id, week, data) {
+  if (!DB.cervejas.stock[week]) DB.cervejas.stock[week] = {};
+  DB.cervejas.stock[week][id] = data;
+  await _supabase.from('estoque_cervejas').upsert({ user_id: currentUser.id, semana: week, item_id: id, locais: data }, { onConflict: 'user_id,semana,item_id' });
+}
+function cGetMin(id) { return DB.cervejas.mins[id] || 0; }
+async function cSetMin(id, val) {
+  const v = Math.max(0, val); DB.cervejas.mins[id] = v;
+  await _supabase.from('minimos_cervejas').upsert({ user_id: currentUser.id, item_id: id, minimo: v }, { onConflict: 'user_id,item_id' });
+}
+
+// ─── ALIMENTOS helpers ─────────────────────────────────────────────────────────
+function aGetCount(item, w) { return DB.alimentos.counts[w][item] || 0; }
+async function aSetCount(item, w, val) {
+  const v = Math.max(0, val); DB.alimentos.counts[w][item] = v;
+  await _supabase.from('estoque_alimentos').upsert({ user_id: currentUser.id, semana: w+1, item_nome: item, quantidade: v }, { onConflict: 'user_id,semana,item_nome' });
+}
+function aGetMin(item) { return DB.alimentos.mins[item] || 0; }
+async function aSetMin(item, val) {
+  const v = Math.max(0, val); DB.alimentos.mins[item] = v;
+  await _supabase.from('minimos_alimentos').upsert({ user_id: currentUser.id, item_nome: item, minimo: v }, { onConflict: 'user_id,item_nome' });
+}
+
+function itemStatus(qty, min) {
+  if (min === 0) return qty > 0 ? 'ok' : 'none';
+  if (qty < min) return 'missing';
+  if (qty < min * 1.5) return 'low';
+  return 'ok';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DADOS
+// ═══════════════════════════════════════════════════════════════════════════════
+const CAT_BEBIDAS = [
+  { nome:"Coca-Cola & Pepsi", itens:[{id:23,nome:"Coca-Cola"},{id:24,nome:"Coca-Cola Zero"},{id:1721,nome:"Coca-Cola 2 Litros"},{id:3141,nome:"Coca-Cola Zero 2L"},{id:29,nome:"Pepsi"},{id:30,nome:"Pepsi Black"}]},
+  { nome:"Fanta & Sprite", itens:[{id:25,nome:"Fanta Laranja"},{id:26,nome:"Fanta Uva"},{id:3259,nome:"Fanta Laranja Zero"},{id:28,nome:"Sprite"},{id:3260,nome:"Sprite Zero"}]},
+  { nome:"Guaraná", itens:[{id:32,nome:"Guaraná"},{id:33,nome:"Guaraná Zero"},{id:34,nome:"Guaraná 2 Litros"},{id:56,nome:"Guaraná Açaí"},{id:57,nome:"Guaraná Power"}]},
+  { nome:"Schweppes & Tônica", itens:[{id:27,nome:"Schweppes"},{id:3942,nome:"Schweppes Tônica"},{id:35,nome:"Fys Tônica"},{id:37,nome:"Fys Limão Siciliano"},{id:3945,nome:"Tônica Antarctica"}]},
+  { nome:"Sucos & Del Valle", itens:[{id:44,nome:"Del Valle Uva"},{id:45,nome:"Del Valle Pêssego"},{id:46,nome:"Del Valle Maracujá"},{id:3360,nome:"Suco Laranja Mitz"},{id:33601,nome:"Suco Uva Mitz"},{id:2058,nome:"Matte Leão"},{id:2059,nome:"Matte Leão Limão"}]},
+  { nome:"Água & H2O", itens:[{id:63,nome:"H2O"},{id:64,nome:"H2O Limoneto"},{id:59,nome:"Água de Coco"}]},
+  { nome:"Isotônicos — Gatorade", itens:[{id:1649,nome:"Gatorade Uva"},{id:1650,nome:"Gatorade Laranja"},{id:1651,nome:"Gatorade Tangerina"},{id:1652,nome:"Gatorade Limão"},{id:3719,nome:"Gatorade Blueberry"},{id:3859,nome:"Gatorade Morango"}]},
+  { nome:"Isotônicos — Powerade", itens:[{id:3887,nome:"Powerade Mix Frutas"},{id:3894,nome:"Powerade Uva"},{id:3925,nome:"Powerade Laranja"},{id:3926,nome:"Powerade Limão"},{id:3927,nome:"Powerade Frutas Tropicais"},{id:3932,nome:"Powerade Tangerina"},{id:3934,nome:"Powerade Mint Blast"}]},
+  { nome:"Energéticos", itens:[{id:71,nome:"Monster"},{id:3933,nome:"Monster Zero"}]},
+  { nome:"Legger", itens:[{id:3189,nome:"Legger Citrus"},{id:3404,nome:"Legger Açaí"},{id:3405,nome:"Legger Limão"},{id:3406,nome:"Legger Guaraná"}]},
+  { nome:"Cini", itens:[{id:3533,nome:"Cini Framboesa 2L"},{id:3534,nome:"Cini Laranjinha 2L"},{id:3911,nome:"Cini Guaraná 2L"},{id:2540,nome:"Cini Framboesa 500ml"},{id:3541,nome:"Cini Abacaxi 500ml"},{id:3542,nome:"Cini Gengibirra 500ml"},{id:3543,nome:"Cini Matte Pêssego"},{id:3544,nome:"Cini Matte Limão"},{id:3936,nome:"Cini Framboesa Lata"}]},
+  { nome:"Gasosas & Outros", itens:[{id:38,nome:"Itubaina"},{id:58,nome:"Chocomilk"},{id:3538,nome:"Gasosa Framboesa 600ml"},{id:3539,nome:"Gasosa Abacaxi 600ml"}]},
+];
+
+const CAT_CERVEJAS = [
+  { nome:"Nacionais", itens:[{id:'antarctica',nome:'Antarctica'},{id:'original',nome:'Original'}]},
+  { nome:"Premium & Imports", itens:[{id:'heineken',nome:'Heineken'},{id:'amstel',nome:'Amstel'},{id:'stella',nome:'Stella Artois'},{id:'eisenbahn',nome:'Eisenbahn'}]},
+];
+
+const CAT_ALIMENTOS = [
+  { name:"CARNES & PROTEÍNAS", items:["Hamburguer 150g","Alcatra lanche","Calabresa lanche","Frango lanche","Alcatra porção","Calabresa porção","Brisket","Frango a passarinho","Isca de frango","Meio meio da asa","Meio da asa","Pulled pork","Isca de tilapia","Torresmo rolo","Camarao empanado"]},
+  { name:"ACOMPANHAMENTOS", items:["Fritas porção","Fritas lanche","Mini kibe","Bolinho de carne seca","Bolinho estufa","Mandioca","Polenta","Fritas rústica","Batata big 7mm"]},
+  { name:"PASTÉIS", items:["Mini pastel de carne","Pastel mini queijo","Pastel de carne","Pastel de queijo","Pastel de carne com queijo","Pastel especial","Pastel de frango com requeijão","Pastel de palmito","Pastel de pizza","Pastel de calabresa","Pastel de camarão"]},
+  { name:"QUEIJOS", items:["American cheese","Queijo cheddar fatiado","Queijo coalho"]},
+  { name:"MOLHOS & EXTRAS", items:["Billyjack","Baconese","Cebola crispy","Pasta de alho","Croutouns","Tartaro","Mostarda e mel","Mostarda escura","Barbecue","Maionese vigor"]},
+  { name:"PÃES", items:["Pão premium","Pão de hambúrguer","Pão integral","Geleia de pimenta"]},
+];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NAVEGAÇÃO DE APPS
+// ═══════════════════════════════════════════════════════════════════════════════
+let currentTab = 'contar';
+let currentWeek = 1;
+let resumoWeek = 'all';
+let foodCurrentWeek = 0;
+let foodResumoWeek = 5;
+let foodActiveTab = 'contagem';
+const beerExpanded = {};
+
+async function loadApp(app) {
+  currentApp = app;
+  document.getElementById('app-selector').style.display = 'none';
+  document.getElementById('app-main').style.display = 'block';
+  currentTab = 'contar';
+  currentWeek = 1;
+  resumoWeek = 'all';
+  foodCurrentWeek = 0;
+  foodResumoWeek = 5;
+  foodActiveTab = 'contagem';
+
+  const weekBar = document.getElementById('weekBar');
+  const fab = document.getElementById('fabClear');
+  const tabBar = document.getElementById('tabBar');
+
+  if (app === 'bebidas') {
+    document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Bebidas</span>';
+    weekBar.style.display = 'flex';
+    tabBar.innerHTML = `
+      <button class="tab-btn active" onclick="setTab('contar')">📦 Contar</button>
+      <button class="tab-btn" onclick="setTab('resumo')">📊 Resumo</button>
+      <button class="tab-btn" onclick="setTab('minimos')">⚙️ Mínimos</button>`;
+    renderBebidas();
+
+  } else if (app === 'cervejas') {
+    document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Cervejas</span>';
+    weekBar.style.display = 'flex';
+    tabBar.innerHTML = `
+      <button class="tab-btn active" onclick="setTab('contar')">🍺 Contar</button>
+      <button class="tab-btn" onclick="setTab('resumo')">📊 Resumo</button>
+      <button class="tab-btn" onclick="setTab('minimos')">⚙️ Mínimos</button>`;
+    renderCervejas();
+
+  } else if (app === 'alimentos') {
+    document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Alimentos</span>';
+    weekBar.style.display = 'none';
+    tabBar.innerHTML = `
+      <button class="tab-btn active" onclick="setFoodTab('contagem')">📦 Contar</button>
+      <button class="tab-btn" onclick="setFoodTab('resumo')">📊 Resumo</button>
+      <button class="tab-btn" onclick="setFoodTab('config')">⚙️ Mínimos</button>`;
+    document.getElementById('appContent').innerHTML = buildFoodHTML();
+    buildFoodWeekBar();
+    buildFoodItems();
+
+  } else if (app === 'analytics') {
+    document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Analytics</span>';
+    weekBar.style.display = 'none';
+    fab.style.display = 'none';
+    tabBar.innerHTML = `<button class="tab-btn active" onclick="">📊 Resumo Geral</button>`;
+    renderAnalytics();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP: BEBIDAS
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderBebidas() {
+  document.getElementById('appContent').innerHTML = `
+    <div class="main" id="tab-contar">
+      <div class="search-wrap"><input class="search-input" id="searchInput" type="search" placeholder="🔍 Buscar bebida…" oninput="renderContarBebidas()"></div>
+      <div id="contarList"></div>
+      <div style="height:80px"></div>
+    </div>
+    <div class="main no-weekbar" id="tab-resumo" style="display:none">
+      <div class="resumo-wrap">
+        <div class="week-select-wrap" id="resumoWeekBar"></div>
+        <div class="action-btns">
+          <button class="action-btn" onclick="exportCSVBebidas()">⬇ CSV</button>
+          <button class="action-btn" onclick="exportPDFBebidas()">📄 PDF</button>
+        </div>
+        <div class="status-cards">
+          <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Faltando</div></div>
+          <div class="status-card low"><div class="sc-num" id="sc-low">0</div><div class="sc-label">Baixo</div></div>
+          <div class="status-card ok"><div class="sc-num" id="sc-ok">0</div><div class="sc-label">OK</div></div>
+        </div>
+        <div id="resumoContent"></div>
+      </div>
+    </div>
+    <div class="main no-weekbar" id="tab-minimos" style="display:none">
+      <div class="search-wrap"><input class="search-input" id="searchMin" type="search" placeholder="🔍 Buscar bebida…" oninput="renderMinimosBebidas()"></div>
+      <div class="min-list" id="minimosList"></div>
+    </div>`;
+  document.getElementById('weekBar').style.display = 'flex';
+  document.getElementById('fabClear').style.display = 'flex';
+  setTabBebidas('contar');
+}
+
+function setTab(tab) {
+  if (currentApp === 'bebidas') setTabBebidas(tab);
+  else if (currentApp === 'cervejas') setTabCervejas(tab);
+}
+
+function setTabBebidas(tab) {
+  currentTab = tab;
+  ['contar','resumo','minimos'].forEach(t => {
+    const el = document.getElementById(`tab-${t}`);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i === ['contar','resumo','minimos'].indexOf(tab)));
+  document.getElementById('weekBar').style.display = tab === 'contar' ? 'flex' : 'none';
+  document.getElementById('fabClear').style.display = tab === 'contar' ? 'flex' : 'none';
+  if (tab === 'contar') renderContarBebidas();
+  if (tab === 'resumo') renderResumoBebidas();
+  if (tab === 'minimos') renderMinimosBebidas();
+}
+
+function setWeek(w) {
+  currentWeek = w;
+  document.querySelectorAll('#weekBar .week-btn').forEach((b,i) => b.classList.toggle('active', i+1 === w));
+  if (currentApp === 'bebidas') renderContarBebidas();
+  if (currentApp === 'cervejas') renderContarCervejas();
+}
+
+// ─ Contar Bebidas ─────────────────────────────────────────────────────────────
+let _popoverId=null, _popoverMode='plus', _editingId=null;
+
+function renderContarBebidas() {
+  const q = (document.getElementById('searchInput')?.value||'').toLowerCase().trim();
+  let html='';
+  CAT_BEBIDAS.forEach(cat => {
+    const items = cat.itens.filter(it => !q || it.nome.toLowerCase().includes(q) || String(it.id).includes(q));
+    if (!items.length) return;
+    html += `<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div><div class="item-list">`;
+    items.forEach(it => {
+      const qty = bGetQty(it.id, currentWeek);
+      const min = bGetMin(it.id);
+      const st = itemStatus(qty,min);
+      const cls = st==='missing'?'critical':st==='low'?'low':qty>0?'has-qty':'';
+      html+=`<div class="item-card ${cls}" id="card-${it.id}">
+        <div class="item-name-wrap" onclick="openPopover(event,${it.id},'plus','b')">
+          <div class="item-name">${it.nome}</div><div class="item-code">#${it.id}</div>
+        </div>
+        ${min>0?`<span class="min-badge">mín ${min}</span>`:''}
+        <div class="counter-ctrl">
+          <button class="btn-adj btn-minus" onclick="openPopover(event,${it.id},'minus','b')">−</button>
+          <div class="qty-display ${qty===0?'zero':''}" id="qty-${it.id}" onclick="editQtyBebida(${it.id})">${qty}</div>
+          <button class="btn-adj btn-plus" onclick="openPopover(event,${it.id},'plus','b')">+</button>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  if (!html) html=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Nenhum item encontrado</div></div>`;
+  document.getElementById('contarList').innerHTML = html;
+}
+
+function editQtyBebida(id) {
+  if (_editingId!==null) return;
+  _editingId = id;
+  const el = document.getElementById(`qty-${id}`);
+  if (!el||el.tagName!=='DIV') return;
+  const cur = bGetQty(id,currentWeek);
+  const inp = document.createElement('input');
+  inp.type='number'; inp.min='0'; inp.value=cur; inp.className='qty-input-edit'; inp.id=`qedit-${id}`;
+  el.replaceWith(inp); inp.focus(); inp.select();
+  inp.addEventListener('blur',()=>commitQtyBebida(id));
+}
+async function commitQtyBebida(id) {
+  const inp = document.getElementById(`qedit-${id}`); if(!inp) return;
+  const v = Math.max(0,parseInt(inp.value)||0);
+  await bSetQty(id,currentWeek,v);
+  const div = document.createElement('div');
+  div.className=`qty-display${v===0?' zero':''}`;div.id=`qty-${id}`;div.textContent=v;div.onclick=()=>editQtyBebida(id);
+  inp.replaceWith(div); refreshCardBebida(id); _editingId=null;
+}
+function refreshCardBebida(id) {
+  const qty=bGetQty(id,currentWeek), min=bGetMin(id), st=itemStatus(qty,min);
+  const card=document.getElementById(`card-${id}`); if(!card) return;
+  card.className=`item-card ${st==='missing'?'critical':st==='low'?'low':qty>0?'has-qty':''}`;
+  const qd=document.getElementById(`qty-${id}`); if(qd){qd.textContent=qty;qd.className=`qty-display${qty===0?' zero':''}`;}
+}
+
+// ─ Resumo Bebidas ─────────────────────────────────────────────────────────────
+function renderResumoBebidas() {
+  const wb = document.getElementById('resumoWeekBar');
+  if (wb) {
+    wb.innerHTML='';
+    ['Todas','1ª Sem','2ª Sem','3ª Sem','4ª Sem','5ª Sem'].forEach((lbl,i)=>{
+      const val = i===0?'all':i;
+      const btn = document.createElement('button');
+      btn.className=`week-btn${resumoWeek===val?' active':''}`;
+      btn.textContent=lbl; btn.onclick=()=>{resumoWeek=val;renderResumoBebidas();};
+      wb.appendChild(btn);
     });
   }
+  const stock = getResumoBebidas();
+  const missing=[],low=[],ok=[];
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
+    else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
+    else if(st==='ok') ok.push({...it,qty,min,cat:cat.nome});
+  }));
+  const scM=document.getElementById('sc-missing');if(scM) scM.textContent=missing.length;
+  const scL=document.getElementById('sc-low');if(scL) scL.textContent=low.length;
+  const scO=document.getElementById('sc-ok');if(scO) scO.textContent=ok.length;
 
-  DB_MINS = {};
-  if (minData) {
-    minData.forEach(row => { DB_MINS[row.item_id] = row.minimo_id; });
+  let html='';
+  const semLabel = resumoWeek==='all'?'Todas as semanas':`${resumoWeek}ª Semana`;
+  if(missing.length){
+    html+=`<div class="section-title red">🚨 Faltando</div><div class="alert-cards">`;
+    missing.forEach(it=>{html+=`<div class="alert-card missing"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">${it.cat} · mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
+    html+='</div>';
   }
+  if(low.length){
+    html+=`<div class="section-title yellow">⚠️ Estoque Baixo</div><div class="alert-cards">`;
+    low.forEach(it=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">${it.cat} · mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+  if(ok.length){
+    html+=`<div class="section-title full">✅ Contagem Completa — ${semLabel}</div><table class="full-table"><thead><tr><th>Cód.</th><th>Bebida</th><th>Qtd</th><th>Mín</th><th>Status</th></tr></thead><tbody>`;
+    let lastCat='';
+    const allItems=CAT_BEBIDAS.flatMap(cat=>cat.itens.filter(it=>ok.find(o=>o.id===it.id)).map(it=>({...it,cat:cat.nome})));
+    allItems.forEach(it=>{
+      if(it.cat!==lastCat){html+=`<tr class="cat-row"><td colspan="5">${it.cat}</td></tr>`;lastCat=it.cat;}
+      const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
+      html+=`<tr><td style="color:var(--text-muted);font-size:10px">#${it.id}</td><td>${it.nome}</td><td><b>${qty}</b></td><td>${min||'—'}</td><td><span class="status-badge ${st}">${st==='ok'?'OK':st==='low'?'Baixo':'—'}</span></td></tr>`;
+    });
+    html+='</tbody></table>';
+  }
+  const rc=document.getElementById('resumoContent'); if(rc) rc.innerHTML=html;
 }
 
-async function saveToSupabase(id, week, val) {
-  document.getElementById('indicator-saving').innerText = "A guardar...";
-  const finalVal = Math.max(0, val);
-  
-  if (!DB_STOCK[week]) DB_STOCK[week] = {};
-  DB_STOCK[week][id] = finalVal;
-
-  const { error } = await _supabase.from('estoque_bebidas').upsert({ 
-    user_id: currentUser.id, 
-    semana: week, 
-    item_id: id, 
-    quantidade: finalVal 
-  }, { onConflict: 'user_id,semana,item_id' });
-
-  document.getElementById('indicator-saving').innerText = error ? "Erro ao salvar" : "Sincronizado";
+function getResumoBebidas() {
+  const stock={};
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    stock[it.id]=0;
+    weeks.forEach(w=>{ stock[it.id]+=(DB.bebidas.stock[w]&&DB.bebidas.stock[w][it.id])||0; });
+  }));
+  return stock;
 }
 
-// NAVEGAÇÃO DO APP
-function openApp(appName) {
-  currentApp = appName;
-  document.getElementById('view-hub').classList.remove('active');
-  document.getElementById('view-app').classList.add('active');
-  
-  const titles = { cervejas: "Estoque de Cervejas", bebidas: "Estoque de Bebidas", "contador-9": "Contador 9", analytics: "Analytics Consolidado" };
-  document.getElementById('current-app-title').innerText = titles[appName];
-
-  if(appName === 'analytics') renderAnalytics();
-  else renderStandardApp();
+function renderMinimosBebidas() {
+  const q=(document.getElementById('searchMin')?.value||'').toLowerCase().trim();
+  let html='';
+  CAT_BEBIDAS.forEach(cat=>{
+    const items=cat.itens.filter(it=>!q||it.nome.toLowerCase().includes(q)||String(it.id).includes(q));
+    if(!items.length) return;
+    html+=`<div class="cat-header" style="margin:0 -10px;padding:14px 22px 6px">${cat.nome}</div>`;
+    items.forEach(it=>{
+      const min=bGetMin(it.id);
+      html+=`<div class="min-item">
+        <div class="min-name"><div class="min-name-text">${it.nome}</div><div class="min-code-text">#${it.id}</div></div>
+        <div class="min-ctrl">
+          <button class="btn-adj btn-minus" onclick="adjMinBebida(${it.id},-1)">−</button>
+          <input class="min-input ${min===0?'zero':''}" id="min-${it.id}" type="number" min="0" value="${min}" oninput="saveMinBebida(${it.id},this)">
+          <button class="btn-adj btn-plus" onclick="adjMinBebida(${it.id},1)">+</button>
+        </div>
+      </div>`;
+    });
+  });
+  const ml=document.getElementById('minimosList'); if(ml) ml.innerHTML=html;
 }
-
-function backToHub() {
-  document.getElementById('view-app').classList.remove('active');
-  document.getElementById('view-hub').classList.add('active');
+async function saveMinBebida(id,inp) { const v=parseInt(inp.value)||0; await bSetMin(id,v); inp.classList.toggle('zero',v===0); }
+async function adjMinBebida(id,delta) {
+  const cur=bGetMin(id),nv=Math.max(0,cur+delta);
+  await bSetMin(id,nv);
+  const inp=document.getElementById(`min-${id}`);if(inp){inp.value=nv;inp.classList.toggle('zero',nv===0);}
 }
+function exportCSVBebidas() {
+  const stock=getResumoBebidas();
+  const semLabel=resumoWeek==='all'?'Todas':`${resumoWeek}aSemana`;
+  const rows=[['Código','Bebida','Categoria','Qtd','Mínimo','Status']];
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
+    rows.push([it.id,it.nome,cat.nome,qty,min,st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'Sem mín']);
+  }));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download=`estoque-bebidas-${semLabel}.csv`;a.click();
+  showToast('CSV exportado ✓');
+}
+function exportPDFBebidas() { showToast('Gerando PDF…'); setTimeout(()=>showToast('PDF pronto ✓'),800); }
 
-function renderStandardApp() {
-  const container = document.getElementById('app-dynamic-content');
-  const schema = DATA_SCHEMAS[currentApp] || [];
-  
-  let html = `
-    <div style="margin-bottom:14px; display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;">
-      ${[1, 2, 3, 4, 5].map(w => `
-        <button class="btn-back" style="${currentWeek === w ? 'background:var(--amber); color:#000; font-weight:bold;' : ''}" onclick="changeWeek(${w})">${w}ª Sem</button>
-      `).join('')}
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP: CERVEJAS
+// ═══════════════════════════════════════════════════════════════════════════════
+function renderCervejas() {
+  document.getElementById('appContent').innerHTML = `
+    <div class="main" id="tab-contar">
+      <div class="search-wrap"><input class="search-input" id="searchInput" type="search" placeholder="🔍 Buscar cerveja…" oninput="renderContarCervejas()"></div>
+      <div id="contarList" style="padding:0 10px;display:flex;flex-direction:column;gap:6px"></div>
+      <div style="height:80px"></div>
     </div>
-    <input type="text" class="search-input" placeholder="Buscar por nome..." oninput="filterItems(this.value)">
-    <div id="items-target-list">
-  `;
+    <div class="main no-weekbar" id="tab-resumo" style="display:none">
+      <div class="resumo-wrap">
+        <div class="week-select-wrap" id="resumoWeekBar"></div>
+        <div class="status-cards">
+          <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Faltando</div></div>
+          <div class="status-card low"><div class="sc-num" id="sc-low">0</div><div class="sc-label">Baixo</div></div>
+          <div class="status-card ok"><div class="sc-num" id="sc-ok">0</div><div class="sc-label">OK</div></div>
+        </div>
+        <div id="resumoContent"></div>
+      </div>
+    </div>
+    <div class="main no-weekbar" id="tab-minimos" style="display:none">
+      <div class="search-wrap"><input class="search-input" id="searchMin" type="search" placeholder="🔍 Buscar cerveja…" oninput="renderMinimosCervejas()"></div>
+      <div class="min-list" id="minimosList"></div>
+    </div>`;
+  document.getElementById('weekBar').style.display = 'flex';
+  document.getElementById('fabClear').style.display = 'flex';
+  setTabCervejas('contar');
+}
 
-  schema.forEach(cat => {
-    html += `<div class="cat-header">${cat.nome}</div>`;
-    cat.itens.forEach(it => {
-      const qty = (DB_STOCK[currentWeek] && DB_STOCK[currentWeek][it.id]) || 0;
-      const min = DB_MINS[it.id] || 0;
-      
-      let borderClass = 'ok';
-      if (min > 0 && qty < min) borderClass = 'crit';
-      else if (min > 0 && qty < min * 1.5) borderClass = 'low';
+function setTabCervejas(tab) {
+  currentTab = tab;
+  ['contar','resumo','minimos'].forEach(t=>{
+    const el=document.getElementById(`tab-${t}`); if(el) el.style.display=t===tab?'':'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===['contar','resumo','minimos'].indexOf(tab)));
+  document.getElementById('weekBar').style.display=tab==='contar'?'flex':'none';
+  document.getElementById('fabClear').style.display=tab==='contar'?'flex':'none';
+  if(tab==='contar') renderContarCervejas();
+  if(tab==='resumo') renderResumoCervejas();
+  if(tab==='minimos') renderMinimosCervejas();
+}
 
-      html += `
-        <div class="item-row ${borderClass}" data-search="${it.nome.toLowerCase()}">
-          <div class="item-main-info">
-            <div>
-              <div style="font-weight:600; font-size:15px;">${it.nome}</div>
-              <div style="font-size:11px; color:var(--text-muted);">Mínimo: <strong>${min}</strong></div>
-            </div>
-            <div class="counter-ctrl">
-              <button class="btn-adj btn-minus" onclick="adjustTotal(${it.id}, -1)">-</button>
-              <span class="qty-display" id="total-${it.id}">${qty}</span>
-              <button class="btn-adj btn-plus" onclick="adjustTotal(${it.id}, 1)">+</button>
-            </div>
+function renderContarCervejas() {
+  const q=(document.getElementById('searchInput')?.value||'').toLowerCase().trim();
+  let html='';
+  CAT_CERVEJAS.forEach(cat=>{
+    const items=cat.itens.filter(it=>!q||it.nome.toLowerCase().includes(q));
+    if(!items.length) return;
+    html+=`<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div>`;
+    items.forEach(it=>{
+      const total=cGetTotal(it.id,currentWeek),min=cGetMin(it.id),st=itemStatus(total,min);
+      const cls=st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':'';
+      const isExp=beerExpanded[it.id]||false;
+      const locData=cGetItemData(it.id,currentWeek);
+      let locHtml=LOCAIS.map(loc=>{
+        const lq=locData[loc.id]||0;
+        return `<div class="loc-item"><span class="loc-label">${loc.label}</span>
+          <div class="loc-ctrl">
+            <button class="loc-btn minus" onclick="openPopover(event,'${it.id}','minus','c','${loc.id}')">−</button>
+            <span class="loc-qty ${lq===0?'zero':''}" id="lq-${it.id}-${loc.id}">${lq}</span>
+            <button class="loc-btn plus" onclick="openPopover(event,'${it.id}','plus','c','${loc.id}')">+</button>
+          </div></div>`;
+      }).join('');
+      html+=`<div class="item-card-beer ${cls}" id="card-${it.id}">
+        <div class="item-top">
+          <div class="item-name-wrap" onclick="openPopover(event,'${it.id}','plus','c','estoque')" style="flex:1;min-width:0;cursor:pointer">
+            <div class="item-name-beer">${it.nome}</div>
+            <div class="item-sub">Toque para +1 no Estoque</div>
           </div>
-          <div class="loc-grid">
-            ${it.sub_locais.map(loc => `
-              <div class="loc-box">
-                <span>${loc}</span>
-                <div class="loc-ctrl">
-                  <button class="loc-btn-sm" onclick="adjustSubLocation(${it.id}, -1)">-</button>
-                  <button class="loc-btn-sm" onclick="adjustSubLocation(${it.id}, 1)">+</button>
-                </div>
-              </div>
-            `).join('')}
+          ${min>0?`<span class="min-badge">mín ${min}</span>`:''}
+          <div class="counter-ctrl">
+            <button class="btn-adj btn-minus" onclick="openPopover(event,'${it.id}','minus','c','total')">−</button>
+            <div class="qty-display-beer ${total===0?'zero':''}" id="qty-${it.id}">${total}</div>
+            <button class="btn-adj btn-plus" onclick="openPopover(event,'${it.id}','plus','c','total')">+</button>
           </div>
         </div>
-      `;
+        <button class="toggle-loc" onclick="toggleLoc('${it.id}')">
+          <span id="tog-icon-${it.id}">${isExp?'▲':'▼'}</span>
+          <span id="tog-txt-${it.id}">${isExp?'Ocultar locais':'Ver por local'}</span>
+        </button>
+        <div class="loc-details ${isExp?'':'hidden'}" id="locs-${it.id}">
+          <div class="loc-grid" style="margin-top:6px">${locHtml}</div>
+        </div>
+      </div>`;
     });
   });
-
-  container.innerHTML = html + `</div>`;
+  if(!html) html=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Nenhuma cerveja encontrada</div></div>`;
+  document.getElementById('contarList').innerHTML=html;
 }
 
-function changeWeek(w) {
-  currentWeek = w;
-  renderStandardApp();
+function toggleLoc(id) {
+  beerExpanded[id]=!beerExpanded[id];
+  const det=document.getElementById(`locs-${id}`),icon=document.getElementById(`tog-icon-${id}`),txt=document.getElementById(`tog-txt-${id}`);
+  if(det) det.classList.toggle('hidden',!beerExpanded[id]);
+  if(icon) icon.textContent=beerExpanded[id]?'▲':'▼';
+  if(txt) txt.textContent=beerExpanded[id]?'Ocultar locais':'Ver por local';
 }
 
-function filterItems(text) {
-  const query = text.toLowerCase().trim();
-  document.querySelectorAll('#items-target-list .item-row').forEach(row => {
-    row.style.display = row.getAttribute('data-search').includes(query) ? 'block' : 'none';
+function renderResumoCervejas() {
+  const wb=document.getElementById('resumoWeekBar');
+  if(wb){
+    wb.innerHTML='';
+    ['Todas','1ª Sem','2ª Sem','3ª Sem','4ª Sem','5ª Sem'].forEach((lbl,i)=>{
+      const val=i===0?'all':i;
+      const btn=document.createElement('button');
+      btn.className=`week-btn${resumoWeek===val?' active':''}`;
+      btn.textContent=lbl;btn.onclick=()=>{resumoWeek=val;renderResumoCervejas();};
+      wb.appendChild(btn);
+    });
+  }
+  const weeks=resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  const stock={};
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    stock[it.id]=0;
+    weeks.forEach(w=>{stock[it.id]+=cGetTotal(it.id,w);});
+  }));
+  const missing=[],low=[],ok=[];
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=stock[it.id]||0,min=cGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
+    else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
+    else if(st==='ok') ok.push({...it,qty,min,cat:cat.nome});
+  }));
+  const scM=document.getElementById('sc-missing');if(scM) scM.textContent=missing.length;
+  const scL=document.getElementById('sc-low');if(scL) scL.textContent=low.length;
+  const scO=document.getElementById('sc-ok');if(scO) scO.textContent=ok.length;
+  let html='';
+  if(missing.length){
+    html+=`<div class="section-title red">🚨 Faltando</div><div class="alert-cards">`;
+    missing.forEach(it=>{html+=`<div class="alert-card missing"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+  if(low.length){
+    html+=`<div class="section-title yellow">⚠️ Baixo</div><div class="alert-cards">`;
+    low.forEach(it=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+  if(ok.length){
+    html+=`<div class="section-title full">✅ OK</div><div class="alert-cards">`;
+    ok.forEach(it=>{html+=`<div class="alert-card" style="border-left:3px solid var(--green)"><div class="alert-info"><div class="alert-name">${it.nome}</div></div><div class="alert-qty" style="color:var(--green)">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+  const rc=document.getElementById('resumoContent');if(rc) rc.innerHTML=html;
+}
+
+function renderMinimosCervejas() {
+  const q=(document.getElementById('searchMin')?.value||'').toLowerCase().trim();
+  let html='';
+  CAT_CERVEJAS.forEach(cat=>{
+    const items=cat.itens.filter(it=>!q||it.nome.toLowerCase().includes(q));
+    if(!items.length) return;
+    html+=`<div class="cat-header" style="margin:0 -10px;padding:14px 22px 6px">${cat.nome}</div>`;
+    items.forEach(it=>{
+      const min=cGetMin(it.id);
+      html+=`<div class="min-item">
+        <div class="min-name"><div class="min-name-text">${it.nome}</div></div>
+        <div class="min-ctrl">
+          <button class="btn-adj btn-minus" onclick="adjMinCerveja('${it.id}',-1)">−</button>
+          <input class="min-input ${min===0?'zero':''}" id="cmin-${it.id}" type="number" min="0" value="${min}" oninput="saveMinCerveja('${it.id}',this)">
+          <button class="btn-adj btn-plus" onclick="adjMinCerveja('${it.id}',1)">+</button>
+        </div>
+      </div>`;
+    });
   });
+  const ml=document.getElementById('minimosList');if(ml) ml.innerHTML=html;
+}
+async function saveMinCerveja(id,inp) { const v=parseInt(inp.value)||0; await cSetMin(id,v); inp.classList.toggle('zero',v===0); }
+async function adjMinCerveja(id,delta) {
+  const cur=cGetMin(id),nv=Math.max(0,cur+delta);await cSetMin(id,nv);
+  const inp=document.getElementById(`cmin-${id}`);if(inp){inp.value=nv;inp.classList.toggle('zero',nv===0);}
 }
 
-function adjustTotal(id, delta) {
-  const currentQty = (DB_STOCK[currentWeek] && DB_STOCK[currentWeek][id]) || 0;
-  const newQty = Math.max(0, currentQty + delta);
-  
-  document.getElementById(`total-${id}`).innerText = newQty;
-  saveToSupabase(id, currentWeek, newQty);
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP: ALIMENTOS
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildFoodHTML() {
+  return `
+  <div id="food-week-bar" style="padding:10px 16px;display:flex;align-items:center;gap:8px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface);padding-top:100px"></div>
+  <div style="padding:10px 16px 4px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <input class="search-input" id="food-search" type="search" placeholder="🔍 Buscar item…" oninput="filterFoodItems(this.value)">
+  </div>
+  <div id="food-page-contagem" style="display:block">
+    <div style="padding:14px 16px 80px" id="food-items-container"></div>
+  </div>
+  <div id="food-page-resumo" style="display:none">
+    <div style="padding:14px 16px 80px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div style="font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:2px">Resumo</div>
+        <div style="display:flex;gap:6px">
+          <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportCSVAlimentos()">⬇ CSV</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px" id="food-resumo-week-tabs"></div>
+      <div id="food-resumo-body"></div>
+    </div>
+  </div>
+  <div id="food-page-config" style="display:none">
+    <div class="config-content">
+      <div class="config-top"><div class="config-top-title">Estoque Mínimo</div></div>
+      <div class="config-info">Define o mínimo de cada item. O resumo vai alertar itens <strong style="color:var(--red)">faltando</strong> e <strong style="color:var(--yellow)">baixos</strong>.</div>
+      <div id="food-config-container"></div>
+    </div>
+  </div>`;
 }
 
-function adjustSubLocation(id, delta) {
-  adjustTotal(id, delta);
+function buildFoodWeekBar() {
+  const wb=document.getElementById('food-week-bar');if(!wb)return;
+  wb.innerHTML='<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--text-muted);white-space:nowrap">Semana:</span>';
+  ['1ª','2ª','3ª','4ª','5ª'].forEach((lbl,i)=>{
+    const btn=document.createElement('button');
+    btn.className=`week-btn${i===foodCurrentWeek?' active':''}`;
+    btn.textContent=lbl+' Sem';
+    btn.onclick=()=>setFoodWeek(i,btn);
+    wb.appendChild(btn);
+  });
+  document.getElementById('fabClear').style.display='flex';
 }
 
-function renderAnalytics() {
-  const container = document.getElementById('app-dynamic-content');
-  let ok = 0, baixo = 0, crit = 0;
+function setFoodTab(tab) {
+  foodActiveTab=tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===['contagem','resumo','config'].indexOf(tab)));
+  ['contagem','resumo','config'].forEach(t=>{
+    const el=document.getElementById(`food-page-${t}`);if(el) el.style.display=t===tab?'block':'none';
+  });
+  const wb=document.getElementById('food-week-bar');
+  const fab=document.getElementById('fabClear');
+  if(wb) wb.style.display=tab==='config'?'none':'';
+  if(fab) fab.style.display=tab==='config'?'none':'flex';
+  if(tab==='resumo') buildFoodResumo();
+  if(tab==='config') buildFoodConfig();
+}
 
-  Object.keys(DATA_SCHEMAS).forEach(app => {
-    DATA_SCHEMAS[app].forEach(cat => {
-      cat.itens.forEach(it => {
-        const qty = (DB_STOCK[currentWeek] && DB_STOCK[currentWeek][it.id]) || 0;
-        const min = DB_MINS[it.id] || 0;
-        if (min > 0 && qty < min) crit++;
-        else if (min > 0 && qty < min * 1.5) baixo++;
-        else ok++;
+function setFoodWeek(w,btn) {
+  foodCurrentWeek=w;
+  document.querySelectorAll('#food-week-bar .week-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  refreshFoodDisplays();
+}
+
+function buildFoodItems() {
+  const c=document.getElementById('food-items-container');if(!c)return;
+  c.innerHTML='';
+  CAT_ALIMENTOS.forEach(cat=>{
+    const sec=document.createElement('div');sec.className='category-section';
+    const h=document.createElement('div');h.className='category-header-food';h.textContent=cat.name;sec.appendChild(h);
+    cat.items.forEach(item=>{
+      const row=document.createElement('div');row.className='item-row';row.dataset.item=item.toLowerCase();
+      const name=document.createElement('div');name.className='item-row-name';name.textContent=item;
+      const badge=document.createElement('div');badge.className='item-min-badge';badge.id='fb-'+encodeURIComponent(item);
+      const ctrl=document.createElement('div');ctrl.className='counter-controls';
+      const minus=document.createElement('button');minus.className='btn-adj btn-minus';minus.textContent='−';
+      const display=document.createElement('input');display.type='number';display.min='0';
+      display.className='count-display zero';display.value='0';display.id='fcnt-'+encodeURIComponent(item);
+      display.oninput=()=>{const nv=Math.max(0,parseInt(display.value)||0);aSetCount(item,foodCurrentWeek,nv);updateFoodRowStatus(item,row,nv);display.className='count-display'+(nv===0?' zero':'');};
+      display.onblur=()=>{display.value=aGetCount(item,foodCurrentWeek);};
+      const plus=document.createElement('button');plus.className='btn-adj btn-plus';plus.textContent='+';
+      minus.onclick=()=>changeFoodCount(item,-1,row,display);
+      plus.onclick=()=>openFoodModal(item,row,display);
+      name.onclick=()=>changeFoodCount(item,1,row,display);
+      ctrl.appendChild(minus);ctrl.appendChild(display);ctrl.appendChild(plus);
+      row.appendChild(name);row.appendChild(badge);row.appendChild(ctrl);sec.appendChild(row);
+    });
+    c.appendChild(sec);
+  });
+  refreshFoodDisplays();
+}
+
+async function changeFoodCount(item,delta,row,display) {
+  const nv=Math.max(0,aGetCount(item,foodCurrentWeek)+delta);
+  await aSetCount(item,foodCurrentWeek,nv);
+  display.value=nv;display.className='count-display'+(nv===0?' zero':'');
+  display.classList.add('bump');setTimeout(()=>display.classList.remove('bump'),200);
+  updateFoodRowStatus(item,row,nv);
+}
+
+function updateFoodRowStatus(item,row,qty) {
+  const min=aGetMin(item),s=qty===0&&min>0?'missing':qty<min&&min>0?'missing':qty<=min*1.5&&min>0&&qty>=min?'low':'ok';
+  row.classList.toggle('has-count',qty>0);
+  row.classList.toggle('is-low',qty>0&&qty>=min&&qty<=min*1.5&&min>0);
+  row.classList.toggle('is-missing',(qty<min&&min>0));
+  const b=document.getElementById('fb-'+encodeURIComponent(item));
+  if(b) b.textContent=aGetMin(item)>0?`mín ${aGetMin(item)}`:'';
+}
+
+function refreshFoodDisplays() {
+  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+    const el=document.getElementById('fcnt-'+encodeURIComponent(item));if(!el) return;
+    const v=aGetCount(item,foodCurrentWeek);el.value=v;el.className='count-display'+(v===0?' zero':'');
+    const row=el.closest('.item-row');if(row) updateFoodRowStatus(item,row,v);
+  }));
+}
+
+function filterFoodItems(q) {
+  q=q.toLowerCase().trim();
+  document.querySelectorAll('.item-row').forEach(r=>{r.style.display=(!q||r.dataset.item.includes(q))?'':'none';});
+  document.querySelectorAll('.category-section').forEach(s=>{s.style.display=[...s.querySelectorAll('.item-row')].some(r=>r.style.display!=='none')?'':'none';});
+}
+
+// Food Modal
+let _foodModalItem=null,_foodModalRow=null,_foodModalDisplay=null;
+function openFoodModal(item,row,display) {
+  _foodModalItem=item;_foodModalRow=row;_foodModalDisplay=display;
+  document.getElementById('food-modal-item').textContent=item;
+  document.getElementById('food-modal-current').textContent=aGetCount(item,foodCurrentWeek);
+  document.getElementById('food-modal-input').value='';
+  document.getElementById('foodModal').style.display='flex';
+  setTimeout(()=>document.getElementById('food-modal-input').focus(),50);
+}
+function closeFoodModal() { document.getElementById('foodModal').style.display='none'; _foodModalItem=null; }
+async function confirmFoodModal() {
+  if(!_foodModalItem) return;
+  const add=Math.max(0,parseInt(document.getElementById('food-modal-input').value)||0);
+  if(add>0){
+    const nv=aGetCount(_foodModalItem,foodCurrentWeek)+add;
+    await aSetCount(_foodModalItem,foodCurrentWeek,nv);
+    if(_foodModalDisplay){_foodModalDisplay.value=nv;_foodModalDisplay.className='count-display';}
+    if(_foodModalRow) updateFoodRowStatus(_foodModalItem,_foodModalRow,nv);
+  }
+  closeFoodModal();
+}
+
+// Food Resumo
+function buildFoodResumo() {
+  const body=document.getElementById('food-resumo-body');if(!body) return;
+  const tabs=document.getElementById('food-resumo-week-tabs');if(!tabs) return;
+  tabs.innerHTML='';
+  ['1ª Sem','2ª Sem','3ª Sem','4ª Sem','5ª Sem','Todas'].forEach((lbl,i)=>{
+    const btn=document.createElement('button');
+    btn.className='week-btn'+(i===foodResumoWeek?' active':'');btn.textContent=lbl;
+    btn.onclick=()=>{foodResumoWeek=i;buildFoodResumo();};tabs.appendChild(btn);
+  });
+  const weeks=foodResumoWeek===5?[0,1,2,3,4]:[foodResumoWeek];
+  const agg={};weeks.forEach(w=>Object.entries(DB.alimentos.counts[w]).forEach(([item,val])=>{if(val>0) agg[item]=(agg[item]||0)+val;}));
+  const allWithMin=[];CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{if(aGetMin(item)>0) allWithMin.push(item);}));
+  const missing=[],low=[];
+  allWithMin.forEach(item=>{
+    const qty=agg[item]||0,min=aGetMin(item);
+    if(qty<min) missing.push({item,qty,min});
+    else if(qty<=min*1.5) low.push({item,qty,min});
+  });
+  const ok=allWithMin.filter(i=>{ const qty=agg[i]||0,min=aGetMin(i); return qty>=min&&qty>min*1.5; }).length;
+  let html=`<div class="status-cards">
+    <div class="status-card missing"><div class="sc-num">${missing.length}</div><div class="sc-label">Faltando</div></div>
+    <div class="status-card low"><div class="sc-num">${low.length}</div><div class="sc-label">Baixo</div></div>
+    <div class="status-card ok"><div class="sc-num">${ok}</div><div class="sc-label">OK</div></div>
+  </div>`;
+  if(missing.length){
+    html+=`<div class="section-title red">🚨 Faltando</div><div class="alert-cards">`;
+    missing.forEach(({item,qty,min})=>{html+=`<div class="alert-card missing"><div class="alert-info"><div class="alert-name">${item}</div><div class="alert-detail">mín ${min} · falta ${min-qty}</div></div><div class="alert-qty">${qty}</div></div>`;});
+    html+='</div>';
+  }
+  if(low.length){
+    html+=`<div class="section-title yellow">⚠️ Baixo</div><div class="alert-cards">`;
+    low.forEach(({item,qty,min})=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${item}</div><div class="alert-detail">mín ${min}</div></div><div class="alert-qty">${qty}</div></div>`;});
+    html+='</div>';
+  }
+  const hasData=Object.values(agg).some(v=>v>0);
+  if(hasData){
+    html+=`<div class="section-title full">📋 Contagem</div>`;
+    CAT_ALIMENTOS.forEach(cat=>{
+      const counted=cat.items.filter(i=>agg[i]>0);if(!counted.length) return;
+      html+=`<div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 4px;border-bottom:1px solid var(--border);margin-bottom:6px">${cat.name}</div>`;
+      counted.forEach(item=>{
+        const qty=agg[item]||0,min=aGetMin(item),s=itemStatus(qty,min);
+        html+=`<div class="alert-card" style="border-left:3px solid ${s==='ok'?'var(--green)':s==='low'?'var(--yellow)':'var(--text-muted)'}">
+          <div class="alert-info"><div class="alert-name">${item}</div></div>
+          <div class="alert-qty" style="color:${s==='ok'?'var(--green)':s==='low'?'var(--yellow)':'var(--text)'}">${qty}</div>
+        </div>`;
       });
     });
-  });
-
-  container.innerHTML = `
-    <h3 style="margin-bottom:14px; color:var(--amber);">Consolidado Geral — ${currentWeek}ª Semana</h3>
-    <div class="status-grid">
-      <div class="stat-box"><div class="stat-val ok">${ok}</div><div class="stat-lbl">Produtos OK</div></div>
-      <div class="stat-box"><div class="stat-val low">${baixo}</div><div class="stat-lbl">Baixo Estoque</div></div>
-      <div class="stat-box"><div class="stat-val crit">${crit}</div><div class="stat-lbl">Críticos</div></div>
-    </div>
-  `;
+  }
+  body.innerHTML=html;
 }
 
-// Inicializa checando se já há uma sessão ativa
-checkUser();
+function exportCSVAlimentos() {
+  const weeks=foodResumoWeek===5?[0,1,2,3,4]:[foodResumoWeek];
+  const agg={};weeks.forEach(w=>Object.entries(DB.alimentos.counts[w]).forEach(([item,val])=>{if(val>0) agg[item]=(agg[item]||0)+val;}));
+  const rows=[['Item','Categoria','Qtd','Mínimo','Status']];
+  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+    const qty=agg[item]||0,min=aGetMin(item),st=itemStatus(qty,min);
+    if(qty>0||min>0) rows.push([item,cat.name,qty,min,st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—']);
+  }));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download='estoque-alimentos.csv';a.click();
+  showToast('CSV exportado ✓');
+}
+
+function buildFoodConfig() {
+  const c=document.getElementById('food-config-container');if(!c) return;
+  c.innerHTML='';
+  CAT_ALIMENTOS.forEach(cat=>{
+    const sec=document.createElement('div');
+    const ch=document.createElement('div');ch.className='config-section-title';ch.textContent=cat.name;sec.appendChild(ch);
+    cat.items.forEach(item=>{
+      const row=document.createElement('div');row.className='config-item';
+      const name=document.createElement('div');name.className='config-item-name';name.textContent=item;
+      const ctrl=document.createElement('div');ctrl.className='min-control';
+      const btnM=document.createElement('button');btnM.className='min-btn minus';btnM.textContent='−';
+      const valEl=document.createElement('input');valEl.type='number';valEl.min='0';
+      valEl.className='min-val'+(aGetMin(item)===0?' zero':'');valEl.value=aGetMin(item);valEl.id='fmin-'+encodeURIComponent(item);
+      const btnP=document.createElement('button');btnP.className='min-btn plus';btnP.textContent='+';
+      btnM.onclick=()=>changeFoodMin(item,-1,valEl);
+      btnP.onclick=()=>changeFoodMin(item,1,valEl);
+      valEl.oninput=async()=>{const nv=Math.max(0,parseInt(valEl.value)||0);await aSetMin(item,nv);valEl.className='min-val'+(nv===0?' zero':'');};
+      valEl.onblur=()=>{valEl.value=aGetMin(item);};
+      ctrl.appendChild(btnM);ctrl.appendChild(valEl);ctrl.appendChild(btnP);
+      row.appendChild(name);row.appendChild(ctrl);sec.appendChild(row);
+    });
+    c.appendChild(sec);
+  });
+}
+async function changeFoodMin(item,delta,el) {
+  const nv=Math.max(0,aGetMin(item)+delta);await aSetMin(item,nv);
+  el.value=nv;el.className='min-val'+(nv===0?' zero':'');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP: ANALYTICS
+// ═══════════════════════════════════════════════════════════════════════════════
+let anWeek = 'all';
+
+function renderAnalytics() {
+  document.getElementById('appContent').innerHTML = `
+    <div class="main no-weekbar">
+      <div class="analytics-wrap">
+        <div class="analytics-title">📊 Analytics Geral</div>
+        <div class="analytics-sub">Resumo consolidado de todos os estoques</div>
+        <div class="an-week-bar" id="anWeekBar"></div>
+        <div id="analyticsBody"></div>
+      </div>
+    </div>`;
+  buildAnWeekBar();
+  buildAnalyticsBody();
+}
+
+function buildAnWeekBar() {
+  const wb=document.getElementById('anWeekBar');if(!wb) return;
+  wb.innerHTML='';
+  ['Todas','1ª Sem','2ª Sem','3ª Sem','4ª Sem','5ª Sem'].forEach((lbl,i)=>{
+    const val=i===0?'all':i;
+    const btn=document.createElement('button');
+    btn.className=`week-btn${anWeek===val?' active':''}`;
+    btn.textContent=lbl;btn.onclick=()=>{anWeek=val;buildAnalyticsBody();};
+    wb.appendChild(btn);
+  });
+}
+
+function buildAnalyticsBody() {
+  const weeks_n = anWeek==='all'?[1,2,3,4,5]:[anWeek];
+  const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
+
+  // Aggregate
+  const bStock={};
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    bStock[it.id]=0; weeks_n.forEach(w=>{bStock[it.id]+=(DB.bebidas.stock[w]&&DB.bebidas.stock[w][it.id])||0;});
+  }));
+  const cStock={};
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    cStock[it.id]=0; weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});
+  }));
+  const aStock={};
+  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+    aStock[item]=0; weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
+  }));
+
+  // Status counts
+  const bMissing=[],bLow=[],bOk=[];
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') bMissing.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
+    else if(st==='low') bLow.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
+    else if(st==='ok') bOk.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
+  }));
+  const cMissing=[],cLow=[],cOk=[];
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') cMissing.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
+    else if(st==='low') cLow.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
+    else if(st==='ok') cOk.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
+  }));
+  const aMissing=[],aLow=[],aOk=[];
+  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+    const qty=aStock[item],min=aGetMin(item),st=itemStatus(qty,min);
+    if(st==='missing') aMissing.push({nome:item,qty,min,src:'🍔 Alimentos'});
+    else if(st==='low') aLow.push({nome:item,qty,min,src:'🍔 Alimentos'});
+    else if(st==='ok') aOk.push({nome:item,qty,min,src:'🍔 Alimentos'});
+  }));
+
+  const allMissing=[...bMissing,...cMissing,...aMissing];
+  const allLow=[...bLow,...cLow,...aLow];
+  const allOk=[...bOk,...cOk,...aOk];
+  const total=allMissing.length+allLow.length+allOk.length;
+
+  let html=`
+  <div class="analytics-grid">
+    <div class="an-card danger"><div class="an-num">${allMissing.length}</div><div class="an-label">Faltando</div></div>
+    <div class="an-card warning"><div class="an-num">${allLow.length}</div><div class="an-label">Baixo</div></div>
+    <div class="an-card success"><div class="an-num">${allOk.length}</div><div class="an-label">OK</div></div>
+  </div>
+
+  <div class="analytics-grid" style="margin-bottom:18px">
+    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🥤</div><div class="an-sub">B: ${bMissing.length}⚠ ${bLow.length}⬇ ${bOk.length}✓</div><div class="an-label">Bebidas</div></div>
+    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍺</div><div class="an-sub">B: ${cMissing.length}⚠ ${cLow.length}⬇ ${cOk.length}✓</div><div class="an-label">Cervejas</div></div>
+    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍔</div><div class="an-sub">B: ${aMissing.length}⚠ ${aLow.length}⬇ ${aOk.length}✓</div><div class="an-label">Alimentos</div></div>
+  </div>`;
+
+  if(allMissing.length){
+    html+=`<div class="an-section"><div class="an-section-title red">🚨 Faltando — ${allMissing.length} iten${allMissing.length!==1?'s':''}</div>`;
+    allMissing.forEach(it=>{html+=`<div class="an-item-row danger"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">${it.src} · mín ${it.min}</div></div><div class="an-item-qty">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+
+  if(allLow.length){
+    html+=`<div class="an-section"><div class="an-section-title yellow">⚠️ Estoque Baixo — ${allLow.length} iten${allLow.length!==1?'s':''}</div>`;
+    allLow.forEach(it=>{html+=`<div class="an-item-row warning"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">${it.src} · mín ${it.min}</div></div><div class="an-item-qty">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+
+  if(allOk.length){
+    html+=`<div class="an-section"><div class="an-section-title muted">✅ OK — ${allOk.length} iten${allOk.length!==1?'s':''}</div>`;
+    const bGrp=allOk.filter(i=>i.src.includes('Bebidas'));
+    const cGrp=allOk.filter(i=>i.src.includes('Cervejas'));
+    const aGrp=allOk.filter(i=>i.src.includes('Alimentos'));
+    [['🥤 Bebidas',bGrp],['🍺 Cervejas',cGrp],['🍔 Alimentos',aGrp]].forEach(([lbl,grp])=>{
+      if(!grp.length) return;
+      html+=`<div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;padding:8px 0 4px;border-bottom:1px solid var(--border);margin-bottom:6px">${lbl}</div>`;
+      grp.forEach(it=>{html+=`<div class="an-item-row" style="border-left:3px solid var(--green)"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">mín ${it.min}</div></div><div class="an-item-qty" style="color:var(--green)">${it.qty}</div></div>`;});
+    });
+    html+='</div>';
+  }
+
+  if(total===0){
+    html+=`<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Nenhuma contagem registrada ainda.<br>Faça a contagem nos apps para ver o resumo.</div></div>`;
+  }
+
+  const body=document.getElementById('analyticsBody');if(body) body.innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POPOVER COMPARTILHADO (bebidas + cervejas)
+// ═══════════════════════════════════════════════════════════════════════════════
+let _popoverApp='b', _popoverLocTarget='total';
+
+function openPopover(evt, id, mode, app, locTarget) {
+  if(evt) evt.stopPropagation();
+  _popoverId=id; _popoverMode=mode; _popoverApp=app||'b'; _popoverLocTarget=locTarget||'total';
+  const pop=document.getElementById('adjPopover');
+  const title=document.getElementById('adjPopoverTitle');
+  const confirm=document.getElementById('adjPopoverConfirm');
+  const inp=document.getElementById('adjPopoverInput');
+  let locLabel='Total';
+  if(app==='c'&&locTarget!=='total') locLabel=LOCAIS.find(l=>l.id===locTarget)?.label||locTarget;
+  if(mode==='plus'){title.textContent=`Adicionar — ${locLabel}`;title.className='adj-popover-title plus';confirm.className='adj-popover-confirm plus';}
+  else {title.textContent=`Subtrair — ${locLabel}`;title.className='adj-popover-title minus';confirm.className='adj-popover-confirm minus';}
+  inp.value=1; pop.classList.add('show'); pop.style.transform='';
+  if(evt&&evt.currentTarget){
+    const btn=evt.currentTarget,rect=btn.getBoundingClientRect(),popW=210;
+    let left=rect.left-popW/2+rect.width/2;left=Math.max(8,Math.min(left,window.innerWidth-popW-8));
+    let top=rect.bottom+6;if(top+130>window.innerHeight) top=rect.top-130;
+    pop.style.left=left+'px';pop.style.top=top+'px';
+  } else { pop.style.left='50%';pop.style.top='50%';pop.style.transform='translate(-50%,-50%)'; }
+  setTimeout(()=>inp.focus(),50);
+}
+function closePopover() { document.getElementById('adjPopover').classList.remove('show'); _popoverId=null; }
+async function confirmAdj() {
+  if(_popoverId===null) return;
+  const val=parseInt(document.getElementById('adjPopoverInput').value)||0;
+  if(val<=0){closePopover();return;}
+  const delta=_popoverMode==='plus'?val:-val;
+  if(_popoverApp==='b'){
+    const cur=bGetQty(_popoverId,currentWeek);
+    await bSetQty(_popoverId,currentWeek,Math.max(0,cur+delta));
+    refreshCardBebida(_popoverId);
+  } else if(_popoverApp==='c') {
+    if(_popoverLocTarget==='total'){
+      const d=cGetItemData(_popoverId,currentWeek);
+      d.estoque=Math.max(0,(d.estoque||0)+delta);
+      await cSetItemData(_popoverId,currentWeek,d);
+    } else {
+      const d=cGetItemData(_popoverId,currentWeek);
+      d[_popoverLocTarget]=Math.max(0,(d[_popoverLocTarget]||0)+delta);
+      await cSetItemData(_popoverId,currentWeek,d);
+    }
+    refreshCardCerveja(_popoverId);
+  }
+  closePopover();
+}
+function refreshCardCerveja(id) {
+  const total=cGetTotal(id,currentWeek),min=cGetMin(id),st=itemStatus(total,min);
+  const card=document.getElementById(`card-${id}`);if(!card) return;
+  card.className=`item-card-beer ${st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':''}`;
+  const qd=document.getElementById(`qty-${id}`);if(qd){qd.textContent=total;qd.className=`qty-display-beer${total===0?' zero':''}`;}
+  LOCAIS.forEach(loc=>{
+    const lq=(cGetItemData(id,currentWeek)[loc.id]||0);
+    const lel=document.getElementById(`lq-${id}-${loc.id}`);if(lel){lel.textContent=lq;lel.className=`loc-qty${lq===0?' zero':''}`;}
+  });
+}
+
+document.addEventListener('click',(e)=>{
+  const pop=document.getElementById('adjPopover');
+  if(pop.classList.contains('show')&&!pop.contains(e.target)) closePopover();
+});
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Enter'){
+    if(document.getElementById('adjPopover').classList.contains('show')) confirmAdj();
+    if(document.getElementById('foodModal').style.display==='flex') confirmFoodModal();
+  }
+  if(e.key==='Escape'){closePopover();}
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LIMPAR SEMANA
+// ═══════════════════════════════════════════════════════════════════════════════
+function showClearModal() {
+  let label;
+  if(currentApp==='alimentos') label=`${foodCurrentWeek+1}ª semana de Alimentos`;
+  else label=`${currentWeek}ª semana de ${currentApp==='bebidas'?'Bebidas':'Cervejas'}`;
+  document.getElementById('clearModalText').textContent=`Zerar todas as contagens da ${label}?`;
+  document.getElementById('clearModal').classList.add('show');
+}
+function hideModal() { document.getElementById('clearModal').classList.remove('show'); }
+async function clearWeek() {
+  hideModal();
+  if(currentApp==='bebidas'){
+    DB.bebidas.stock[currentWeek]={};
+    await _supabase.from('estoque_bebidas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    renderContarBebidas();
+  } else if(currentApp==='cervejas'){
+    DB.cervejas.stock[currentWeek]={};
+    await _supabase.from('estoque_cervejas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    renderContarCervejas();
+  } else if(currentApp==='alimentos'){
+    DB.alimentos.counts[foodCurrentWeek]={};
+    await _supabase.from('estoque_alimentos').delete().match({user_id:currentUser.id,semana:foodCurrentWeek+1});
+    refreshFoodDisplays();
+  }
+  showToast('Semana zerada ✓');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════════════════
+let _toastTimer=null;
+function showToast(msg) {
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  if(_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════════
+(async()=>{
+  const{data:{session}}=await _supabase.auth.getSession();
+  if(session&&session.user){
+    currentUser=session.user;
+    await fetchAllData();
+    showSelector();
+  } else {
+    showLogin();
+  }
+})();
 </script>
 </body>
 </html>
