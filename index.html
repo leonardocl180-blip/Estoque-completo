@@ -10,7 +10,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-/* ─── DESIGN TOKENS ──────────────────────────────────────────────────────────── */
 :root {
   --bg: #0f0e0d;
   --surface: #1a1917;
@@ -36,7 +35,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; overflow-x: hidden; }
 
-/* ─── TELA DE LOGIN ──────────────────────────────────────────────────────────── */
 #login-screen {
   position: fixed; inset: 0; background: var(--bg); z-index: 9999;
   display: flex; align-items: center; justify-content: center; padding: 20px;
@@ -90,7 +88,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   text-align: center; display: none;
 }
 
-/* ─── TELA SELETOR DE APP ────────────────────────────────────────────────────── */
 #app-selector {
   position: fixed; inset: 0; background: var(--bg); z-index: 8888;
   display: none; flex-direction: column;
@@ -107,7 +104,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   cursor: pointer; transition: all 0.15s;
 }
 .btn-logout:hover { border-color: var(--red); color: var(--red); }
-
 .selector-body {
   flex: 1; display: flex; flex-direction: column; align-items: center;
   justify-content: center; padding: 24px 20px; gap: 16px;
@@ -138,7 +134,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .app-card.analytics:hover { border-color: var(--blue); }
 .app-card.analytics .app-card-name { color: var(--blue); }
 
-/* ─── HEADER GERAL ───────────────────────────────────────────────────────────── */
 #app-main { display: none; }
 header {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
@@ -157,8 +152,6 @@ header {
   cursor: pointer; transition: all 0.15s;
 }
 .btn-home:hover { border-color: var(--amber); color: var(--amber); }
-
-/* TABS */
 .tab-bar { display: flex; border-top: 1px solid var(--border); }
 .tab-btn {
   flex: 1; padding: 9px 4px; border: none; background: none; cursor: pointer;
@@ -169,7 +162,6 @@ header {
 .tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); }
 .tab-btn:hover:not(.active) { color: var(--text); }
 
-/* WEEK BAR */
 .week-bar {
   position: fixed; top: 83px; left: 0; right: 0; z-index: 90;
   background: var(--bg); border-bottom: 1px solid var(--border);
@@ -185,11 +177,9 @@ header {
 .week-btn.active { background: var(--amber); border-color: var(--amber); color: #000; font-weight: 500; }
 .week-btn:hover:not(.active) { border-color: var(--amber); color: var(--amber); }
 
-/* MAIN CONTENT */
 .main { padding-top: 130px; min-height: 100vh; }
 .main.no-weekbar { padding-top: 90px; }
 
-/* SEARCH */
 .search-wrap { padding: 10px 12px 6px; }
 .search-input {
   width: 100%; padding: 9px 14px; background: var(--surface); border: 1px solid var(--border);
@@ -199,7 +189,6 @@ header {
 .search-input:focus { border-color: var(--amber); }
 .search-input::placeholder { color: var(--text-muted); }
 
-/* CATEGORY HEADER */
 .cat-header {
   padding: 14px 12px 6px; font-family: 'Bebas Neue', cursive;
   font-size: 17px; color: var(--amber); letter-spacing: 1px;
@@ -208,7 +197,6 @@ header {
 .cat-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .cat-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); font-weight: 400; }
 
-/* ITEM CARD */
 .item-list { padding: 0 10px; display: flex; flex-direction: column; gap: 6px; }
 .item-card {
   background: var(--surface); border: 1px solid var(--border); border-left: 3px solid transparent;
@@ -219,7 +207,6 @@ header {
 .item-card.has-qty { border-left-color: var(--amber); }
 .item-card.low { border-left-color: var(--yellow); }
 .item-card.critical { border-left-color: var(--red); }
-
 .item-name-wrap { flex: 1; min-width: 0; cursor: pointer; }
 .item-name { font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-code { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
@@ -228,7 +215,6 @@ header {
   background: var(--surface3); border: 1px solid var(--border);
   padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
 }
-
 .counter-ctrl { display: flex; align-items: center; gap: 6px; }
 .btn-adj {
   width: 30px; height: 30px; border-radius: 6px; border: none; cursor: pointer;
@@ -245,7 +231,6 @@ header {
 .qty-display:hover { color: var(--amber) !important; }
 .qty-display.zero { color: var(--text-muted); }
 
-/* CERVEJAS — LOCAIS */
 .item-card-beer {
   background: var(--surface); border: 1px solid var(--border); border-left: 3px solid transparent;
   border-radius: var(--radius); padding: 10px 12px; transition: border-color .15s; user-select: none;
@@ -286,7 +271,6 @@ header {
 .toggle-loc:hover { color: var(--amber); }
 .loc-details.hidden { display: none; }
 
-/* CONTADOR ALIMENTOS — ESTILOS ESPECÍFICOS */
 .item-row {
   display: flex; align-items: center; justify-content: space-between;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
@@ -314,7 +298,6 @@ header {
   color: #d45f1e; padding: 5px 0 7px; border-bottom: 1px solid var(--border); margin-bottom: 8px;
 }
 
-/* FAB */
 .fab {
   position: fixed; bottom: 24px; right: 16px; z-index: 200;
   background: var(--surface2); border: 1px solid var(--border);
@@ -325,12 +308,10 @@ header {
 }
 .fab:hover { border-color: var(--red); }
 
-/* RESUMO / STATUS */
 .resumo-wrap { padding: 10px 12px; }
 .week-select-wrap { margin-bottom: 12px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .week-select-wrap::-webkit-scrollbar { display: none; }
 .week-select-wrap .week-btn { padding: 5px 10px; }
-
 .status-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
 .status-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -341,7 +322,6 @@ header {
 .status-card.missing .sc-num { color: var(--red); }
 .status-card.low .sc-num { color: var(--yellow); }
 .status-card.ok .sc-num { color: var(--green); }
-
 .action-btns { display: flex; gap: 8px; margin-bottom: 14px; }
 .action-btn {
   flex: 1; padding: 9px; background: var(--surface); border: 1px solid var(--border);
@@ -350,7 +330,6 @@ header {
   display: flex; align-items: center; justify-content: center; gap: 5px;
 }
 .action-btn:hover { border-color: var(--amber); color: var(--amber); }
-
 .section-title {
   font-family: 'Bebas Neue', cursive; font-size: 16px; letter-spacing: 0.5px;
   margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
@@ -358,7 +337,6 @@ header {
 .section-title.red { color: var(--red); }
 .section-title.yellow { color: var(--yellow); }
 .section-title.full { color: var(--text-muted); }
-
 .alert-cards { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
 .alert-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -373,7 +351,6 @@ header {
 .alert-card.missing .alert-qty { color: var(--red); }
 .alert-card.low .alert-qty { color: var(--yellow); }
 
-/* TABELA COMPLETA */
 .full-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 80px; }
 .full-table th { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-weight: 400; text-transform: uppercase; letter-spacing: 0.3px; }
 .full-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,.04); }
@@ -388,7 +365,6 @@ header {
 .status-badge.ok { background: var(--green-dim); color: var(--green); }
 .status-badge.none { color: var(--text-muted); background: var(--surface3); }
 
-/* MINIMOS */
 .min-list { padding: 0 10px 80px; display: flex; flex-direction: column; gap: 6px; }
 .min-item {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -407,7 +383,6 @@ header {
 .min-input:focus { border-color: var(--amber); }
 .min-input.zero { color: var(--text-muted); }
 
-/* QTY EDITÁVEL */
 .qty-input-edit {
   font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500;
   color: var(--amber); min-width: 36px; width: 48px; text-align: center;
@@ -417,7 +392,6 @@ header {
 }
 .qty-input-edit::-webkit-outer-spin-button, .qty-input-edit::-webkit-inner-spin-button { -webkit-appearance: none; }
 
-/* MODAL */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000;
   display: none; align-items: center; justify-content: center; padding: 20px;
@@ -437,7 +411,6 @@ header {
 .modal-btn.cancel { background: none; color: var(--text-muted); }
 .modal-btn.confirm { background: var(--red); border-color: var(--red); color: #fff; }
 
-/* MODAL SOMA ALIMENTOS */
 .modal-box {
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: 20px; max-width: 300px; width: 100%;
@@ -456,7 +429,6 @@ header {
 .modal-cancel { flex:1; padding:10px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; }
 .modal-confirm { flex:1; padding:10px; background:var(--green); border:none; border-radius:8px; color:#fff; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; }
 
-/* POPOVER */
 .adj-popover {
   position: fixed; z-index: 900;
   background: var(--surface2); border: 1px solid var(--border);
@@ -493,12 +465,10 @@ header {
 }
 .adj-popover-cancel:hover { color: var(--text); }
 
-/* EMPTY */
 .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
 .empty-icon { font-size: 32px; margin-bottom: 8px; }
 .empty-text { font-size: 13px; }
 
-/* TOAST */
 .toast {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
   background: var(--surface3); border: 1px solid var(--border); color: var(--text);
@@ -507,7 +477,6 @@ header {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ─── ANALYTICS ───────────────────────────────────────────────────────────────── */
 .analytics-wrap { padding: 10px 12px 80px; }
 .analytics-title {
   font-family: 'Bebas Neue', cursive; font-size: 22px; color: var(--blue);
@@ -515,7 +484,6 @@ header {
 }
 .analytics-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
 .analytics-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 18px; }
-.analytics-big { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 14px; }
 .an-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 12px; text-align: center;
@@ -527,7 +495,6 @@ header {
 .an-card.warning .an-num { color: var(--yellow); }
 .an-card.success .an-num { color: var(--green); }
 .an-card.info .an-num { color: var(--blue); }
-
 .an-section { margin-bottom: 18px; }
 .an-section-title {
   font-family: 'Bebas Neue', cursive; font-size: 15px; letter-spacing: 0.5px;
@@ -538,7 +505,6 @@ header {
 .an-section-title.yellow { color: var(--yellow); }
 .an-section-title.blue { color: var(--blue); }
 .an-section-title.muted { color: var(--text-muted); }
-
 .an-item-row {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px; background: var(--surface); border: 1px solid var(--border);
@@ -555,7 +521,6 @@ header {
 .an-week-bar { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .an-week-bar::-webkit-scrollbar { display: none; }
 
-/* CONFIG ALIMENTOS */
 .config-content { padding: 14px 16px 80px; }
 .config-top { margin-bottom: 10px; }
 .config-top-title { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; color:var(--text); }
@@ -580,9 +545,6 @@ header {
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════
-     TELA DE LOGIN
-════════════════════════════════════════════════════ -->
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">Black Skull Bier</div>
@@ -600,9 +562,6 @@ header {
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════
-     SELETOR DE APP (HOME)
-════════════════════════════════════════════════════ -->
 <div id="app-selector">
   <div class="selector-header">
     <div class="selector-logo">Black Skull Bier</div>
@@ -639,11 +598,7 @@ header {
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════
-     APP PRINCIPAL (carregado dinamicamente)
-════════════════════════════════════════════════════ -->
 <div id="app-main">
-  <!-- HEADER -->
   <header>
     <div class="header-top">
       <div class="logo" id="app-logo">Black Skull Bier<span id="app-subtitle">Estoque</span></div>
@@ -655,7 +610,6 @@ header {
     <div class="tab-bar" id="tabBar"></div>
   </header>
 
-  <!-- WEEK BAR (bebidas / cervejas) -->
   <div class="week-bar" id="weekBar" style="display:none">
     <button class="week-btn active" onclick="setWeek(1)">1ª Sem</button>
     <button class="week-btn" onclick="setWeek(2)">2ª Sem</button>
@@ -664,14 +618,10 @@ header {
     <button class="week-btn" onclick="setWeek(5)">5ª Sem</button>
   </div>
 
-  <!-- CONTENT AREA -->
   <div id="appContent"></div>
-
-  <!-- FAB LIMPAR -->
   <button class="fab" id="fabClear" onclick="showClearModal()" style="display:none">🗑 Limpar semana</button>
 </div>
 
-<!-- MODALS COMPARTILHADOS -->
 <div class="modal-overlay" id="clearModal">
   <div class="modal">
     <div class="modal-title">Limpar Semana</div>
@@ -725,6 +675,7 @@ async function checkUser() {
   const { data: { session } } = await _supabase.auth.getSession();
   if (session && session.user) {
     currentUser = session.user;
+    await fetchAllData();
     showSelector();
   } else {
     currentUser = null;
@@ -801,7 +752,7 @@ async function handleLogout() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DATABASE — estado compartilhado
+// DATABASE
 // ═══════════════════════════════════════════════════════════════════════════════
 let DB = {
   bebidas: { stock: {1:{},2:{},3:{},4:{},5:{}}, mins: {} },
@@ -809,29 +760,64 @@ let DB = {
   alimentos: { counts: Array.from({length:5},()=>({})), mins: {} }
 };
 
+// CORREÇÃO: todas as queries filtradas por user_id + log de erros
 async function fetchAllData() {
   if (!currentUser) return;
-  // BEBIDAS
-  const { data: bStock } = await _supabase.from('estoque_bebidas').select('semana,item_id,quantidade');
-  const { data: bMins } = await _supabase.from('minimos_bebidas').select('item_id,minimo_id');
+
+  // BEBIDAS estoque
+  const { data: bStock, error: e1 } = await _supabase
+    .from('estoque_bebidas')
+    .select('semana,item_id,quantidade')
+    .eq('user_id', currentUser.id);
+  if (e1) console.error('fetchAllData estoque_bebidas:', e1);
+
+  // BEBIDAS mínimos
+  const { data: bMins, error: e2 } = await _supabase
+    .from('minimos_bebidas')
+    .select('item_id,minimo_id')
+    .eq('user_id', currentUser.id);
+  if (e2) console.error('fetchAllData minimos_bebidas:', e2);
+
   DB.bebidas.stock = {1:{},2:{},3:{},4:{},5:{}};
-  if (bStock) bStock.forEach(r => { if(DB.bebidas.stock[r.semana]) DB.bebidas.stock[r.semana][r.item_id] = r.quantidade; });
+  if (bStock) bStock.forEach(r => { if (DB.bebidas.stock[r.semana]) DB.bebidas.stock[r.semana][r.item_id] = r.quantidade; });
   DB.bebidas.mins = {};
   if (bMins) bMins.forEach(r => { DB.bebidas.mins[r.item_id] = r.minimo_id; });
 
-  // CERVEJAS
-  const { data: cStock } = await _supabase.from('estoque_cervejas').select('semana,item_id,locais');
-  const { data: cMins } = await _supabase.from('minimos_cervejas').select('item_id,minimo');
+  // CERVEJAS estoque
+  const { data: cStock, error: e3 } = await _supabase
+    .from('estoque_cervejas')
+    .select('semana,item_id,locais')
+    .eq('user_id', currentUser.id);
+  if (e3) console.error('fetchAllData estoque_cervejas:', e3);
+
+  // CERVEJAS mínimos
+  const { data: cMins, error: e4 } = await _supabase
+    .from('minimos_cervejas')
+    .select('item_id,minimo')
+    .eq('user_id', currentUser.id);
+  if (e4) console.error('fetchAllData minimos_cervejas:', e4);
+
   DB.cervejas.stock = {1:{},2:{},3:{},4:{},5:{}};
-  if (cStock) cStock.forEach(r => { if(DB.cervejas.stock[r.semana]) DB.cervejas.stock[r.semana][r.item_id] = r.locais; });
+  if (cStock) cStock.forEach(r => { if (DB.cervejas.stock[r.semana]) DB.cervejas.stock[r.semana][r.item_id] = r.locais; });
   DB.cervejas.mins = {};
   if (cMins) cMins.forEach(r => { DB.cervejas.mins[r.item_id] = r.minimo; });
 
-  // ALIMENTOS
-  const { data: aStock } = await _supabase.from('estoque_alimentos').select('semana,item_nome,quantidade');
-  const { data: aMins } = await _supabase.from('minimos_alimentos').select('item_nome,minimo');
+  // ALIMENTOS estoque
+  const { data: aStock, error: e5 } = await _supabase
+    .from('estoque_alimentos')
+    .select('semana,item_nome,quantidade')
+    .eq('user_id', currentUser.id);
+  if (e5) console.error('fetchAllData estoque_alimentos:', e5);
+
+  // ALIMENTOS mínimos
+  const { data: aMins, error: e6 } = await _supabase
+    .from('minimos_alimentos')
+    .select('item_nome,minimo')
+    .eq('user_id', currentUser.id);
+  if (e6) console.error('fetchAllData minimos_alimentos:', e6);
+
   DB.alimentos.counts = Array.from({length:5},()=>({}));
-  if (aStock) aStock.forEach(r => { const w = r.semana - 1; if(w>=0&&w<5) DB.alimentos.counts[w][r.item_nome] = r.quantidade; });
+  if (aStock) aStock.forEach(r => { const w = r.semana - 1; if (w >= 0 && w < 5) DB.alimentos.counts[w][r.item_nome] = r.quantidade; });
   DB.alimentos.mins = {};
   if (aMins) aMins.forEach(r => { DB.alimentos.mins[r.item_nome] = r.minimo; });
 }
@@ -842,12 +828,23 @@ async function bSetQty(id, week, val) {
   const v = Math.max(0, val);
   if (!DB.bebidas.stock[week]) DB.bebidas.stock[week] = {};
   DB.bebidas.stock[week][id] = v;
-  await _supabase.from('estoque_bebidas').upsert({ user_id: currentUser.id, semana: week, item_id: id, quantidade: v }, { onConflict: 'user_id,semana,item_id' });
+  const { error } = await _supabase.from('estoque_bebidas')
+    .upsert(
+      { user_id: currentUser.id, semana: week, item_id: id, quantidade: v },
+      { onConflict: 'user_id,semana,item_id' }
+    );
+  if (error) { console.error('bSetQty error:', error); showToast('⚠️ Erro ao salvar!'); }
 }
 function bGetMin(id) { return DB.bebidas.mins[id] || 0; }
 async function bSetMin(id, val) {
-  const v = Math.max(0, val); DB.bebidas.mins[id] = v;
-  await _supabase.from('minimos_bebidas').upsert({ user_id: currentUser.id, item_id: id, minimo_id: v }, { onConflict: 'user_id,item_id' });
+  const v = Math.max(0, val);
+  DB.bebidas.mins[id] = v;
+  const { error } = await _supabase.from('minimos_bebidas')
+    .upsert(
+      { user_id: currentUser.id, item_id: id, minimo_id: v },
+      { onConflict: 'user_id,item_id' }
+    );
+  if (error) { console.error('bSetMin error:', error); showToast('⚠️ Erro ao salvar!'); }
 }
 
 // ─── CERVEJAS helpers ──────────────────────────────────────────────────────────
@@ -856,29 +853,57 @@ const LOCAIS = [
   { id:'gel_ext', label:'Gel. Ext.' }, { id:'bar', label:'Bar' },
   { id:'camara', label:'Câmara Fria' }
 ];
-function cGetItemData(id, week) { return (DB.cervejas.stock[week] && DB.cervejas.stock[week][id]) || {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0}; }
-function cGetTotal(id, week) { const d = cGetItemData(id, week); return LOCAIS.reduce((s,l)=>s+(d[l.id]||0),0); }
+function cGetItemData(id, week) {
+  return (DB.cervejas.stock[week] && DB.cervejas.stock[week][id]) || {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+}
+function cGetTotal(id, week) {
+  const d = cGetItemData(id, week);
+  return LOCAIS.reduce((s,l) => s + (d[l.id] || 0), 0);
+}
 async function cSetItemData(id, week, data) {
   if (!DB.cervejas.stock[week]) DB.cervejas.stock[week] = {};
   DB.cervejas.stock[week][id] = data;
-  await _supabase.from('estoque_cervejas').upsert({ user_id: currentUser.id, semana: week, item_id: id, locais: data }, { onConflict: 'user_id,semana,item_id' });
+  const { error } = await _supabase.from('estoque_cervejas')
+    .upsert(
+      { user_id: currentUser.id, semana: week, item_id: id, locais: data },
+      { onConflict: 'user_id,semana,item_id' }
+    );
+  if (error) { console.error('cSetItemData error:', error); showToast('⚠️ Erro ao salvar!'); }
 }
 function cGetMin(id) { return DB.cervejas.mins[id] || 0; }
 async function cSetMin(id, val) {
-  const v = Math.max(0, val); DB.cervejas.mins[id] = v;
-  await _supabase.from('minimos_cervejas').upsert({ user_id: currentUser.id, item_id: id, minimo: v }, { onConflict: 'user_id,item_id' });
+  const v = Math.max(0, val);
+  DB.cervejas.mins[id] = v;
+  const { error } = await _supabase.from('minimos_cervejas')
+    .upsert(
+      { user_id: currentUser.id, item_id: id, minimo: v },
+      { onConflict: 'user_id,item_id' }
+    );
+  if (error) { console.error('cSetMin error:', error); showToast('⚠️ Erro ao salvar!'); }
 }
 
 // ─── ALIMENTOS helpers ─────────────────────────────────────────────────────────
 function aGetCount(item, w) { return DB.alimentos.counts[w][item] || 0; }
 async function aSetCount(item, w, val) {
-  const v = Math.max(0, val); DB.alimentos.counts[w][item] = v;
-  await _supabase.from('estoque_alimentos').upsert({ user_id: currentUser.id, semana: w+1, item_nome: item, quantidade: v }, { onConflict: 'user_id,semana,item_nome' });
+  const v = Math.max(0, val);
+  DB.alimentos.counts[w][item] = v;
+  const { error } = await _supabase.from('estoque_alimentos')
+    .upsert(
+      { user_id: currentUser.id, semana: w + 1, item_nome: item, quantidade: v },
+      { onConflict: 'user_id,semana,item_nome' }
+    );
+  if (error) { console.error('aSetCount error:', error); showToast('⚠️ Erro ao salvar!'); }
 }
 function aGetMin(item) { return DB.alimentos.mins[item] || 0; }
 async function aSetMin(item, val) {
-  const v = Math.max(0, val); DB.alimentos.mins[item] = v;
-  await _supabase.from('minimos_alimentos').upsert({ user_id: currentUser.id, item_nome: item, minimo: v }, { onConflict: 'user_id,item_nome' });
+  const v = Math.max(0, val);
+  DB.alimentos.mins[item] = v;
+  const { error } = await _supabase.from('minimos_alimentos')
+    .upsert(
+      { user_id: currentUser.id, item_nome: item, minimo: v },
+      { onConflict: 'user_id,item_nome' }
+    );
+  if (error) { console.error('aSetMin error:', error); showToast('⚠️ Erro ao salvar!'); }
 }
 
 function itemStatus(qty, min) {
@@ -921,7 +946,7 @@ const CAT_ALIMENTOS = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NAVEGAÇÃO DE APPS
+// NAVEGAÇÃO
 // ═══════════════════════════════════════════════════════════════════════════════
 let currentTab = 'contar';
 let currentWeek = 1;
@@ -979,7 +1004,7 @@ async function loadApp(app) {
     document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Analytics</span>';
     weekBar.style.display = 'none';
     fab.style.display = 'none';
-    tabBar.innerHTML = `<button class="tab-btn active" onclick="">📊 Resumo Geral</button>`;
+    tabBar.innerHTML = `<button class="tab-btn active">📊 Resumo Geral</button>`;
     renderAnalytics();
   }
 }
@@ -1482,7 +1507,7 @@ async function changeFoodCount(item,delta,row,display) {
 }
 
 function updateFoodRowStatus(item,row,qty) {
-  const min=aGetMin(item),s=qty===0&&min>0?'missing':qty<min&&min>0?'missing':qty<=min*1.5&&min>0&&qty>=min?'low':'ok';
+  const min=aGetMin(item);
   row.classList.toggle('has-count',qty>0);
   row.classList.toggle('is-low',qty>0&&qty>=min&&qty<=min*1.5&&min>0);
   row.classList.toggle('is-missing',(qty<min&&min>0));
@@ -1504,7 +1529,6 @@ function filterFoodItems(q) {
   document.querySelectorAll('.category-section').forEach(s=>{s.style.display=[...s.querySelectorAll('.item-row')].some(r=>r.style.display!=='none')?'':'none';});
 }
 
-// Food Modal
 let _foodModalItem=null,_foodModalRow=null,_foodModalDisplay=null;
 function openFoodModal(item,row,display) {
   _foodModalItem=item;_foodModalRow=row;_foodModalDisplay=display;
@@ -1527,7 +1551,6 @@ async function confirmFoodModal() {
   closeFoodModal();
 }
 
-// Food Resumo
 function buildFoodResumo() {
   const body=document.getElementById('food-resumo-body');if(!body) return;
   const tabs=document.getElementById('food-resumo-week-tabs');if(!tabs) return;
@@ -1657,7 +1680,6 @@ function buildAnalyticsBody() {
   const weeks_n = anWeek==='all'?[1,2,3,4,5]:[anWeek];
   const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
 
-  // Aggregate
   const bStock={};
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     bStock[it.id]=0; weeks_n.forEach(w=>{bStock[it.id]+=(DB.bebidas.stock[w]&&DB.bebidas.stock[w][it.id])||0;});
@@ -1671,7 +1693,6 @@ function buildAnalyticsBody() {
     aStock[item]=0; weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
   }));
 
-  // Status counts
   const bMissing=[],bLow=[],bOk=[];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
@@ -1705,7 +1726,6 @@ function buildAnalyticsBody() {
     <div class="an-card warning"><div class="an-num">${allLow.length}</div><div class="an-label">Baixo</div></div>
     <div class="an-card success"><div class="an-num">${allOk.length}</div><div class="an-label">OK</div></div>
   </div>
-
   <div class="analytics-grid" style="margin-bottom:18px">
     <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🥤</div><div class="an-sub">B: ${bMissing.length}⚠ ${bLow.length}⬇ ${bOk.length}✓</div><div class="an-label">Bebidas</div></div>
     <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍺</div><div class="an-sub">B: ${cMissing.length}⚠ ${cLow.length}⬇ ${cOk.length}✓</div><div class="an-label">Cervejas</div></div>
@@ -1717,13 +1737,11 @@ function buildAnalyticsBody() {
     allMissing.forEach(it=>{html+=`<div class="an-item-row danger"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">${it.src} · mín ${it.min}</div></div><div class="an-item-qty">${it.qty}</div></div>`;});
     html+='</div>';
   }
-
   if(allLow.length){
     html+=`<div class="an-section"><div class="an-section-title yellow">⚠️ Estoque Baixo — ${allLow.length} iten${allLow.length!==1?'s':''}</div>`;
     allLow.forEach(it=>{html+=`<div class="an-item-row warning"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">${it.src} · mín ${it.min}</div></div><div class="an-item-qty">${it.qty}</div></div>`;});
     html+='</div>';
   }
-
   if(allOk.length){
     html+=`<div class="an-section"><div class="an-section-title muted">✅ OK — ${allOk.length} iten${allOk.length!==1?'s':''}</div>`;
     const bGrp=allOk.filter(i=>i.src.includes('Bebidas'));
@@ -1736,16 +1754,14 @@ function buildAnalyticsBody() {
     });
     html+='</div>';
   }
-
   if(total===0){
     html+=`<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Nenhuma contagem registrada ainda.<br>Faça a contagem nos apps para ver o resumo.</div></div>`;
   }
-
   const body=document.getElementById('analyticsBody');if(body) body.innerHTML=html;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// POPOVER COMPARTILHADO (bebidas + cervejas)
+// POPOVER COMPARTILHADO
 // ═══════════════════════════════════════════════════════════════════════════════
 let _popoverApp='b', _popoverLocTarget='total';
 
@@ -1831,15 +1847,18 @@ async function clearWeek() {
   hideModal();
   if(currentApp==='bebidas'){
     DB.bebidas.stock[currentWeek]={};
-    await _supabase.from('estoque_bebidas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    const { error } = await _supabase.from('estoque_bebidas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    if(error) console.error('clearWeek bebidas:', error);
     renderContarBebidas();
   } else if(currentApp==='cervejas'){
     DB.cervejas.stock[currentWeek]={};
-    await _supabase.from('estoque_cervejas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    const { error } = await _supabase.from('estoque_cervejas').delete().match({user_id:currentUser.id,semana:currentWeek});
+    if(error) console.error('clearWeek cervejas:', error);
     renderContarCervejas();
   } else if(currentApp==='alimentos'){
     DB.alimentos.counts[foodCurrentWeek]={};
-    await _supabase.from('estoque_alimentos').delete().match({user_id:currentUser.id,semana:foodCurrentWeek+1});
+    const { error } = await _supabase.from('estoque_alimentos').delete().match({user_id:currentUser.id,semana:foodCurrentWeek+1});
+    if(error) console.error('clearWeek alimentos:', error);
     refreshFoodDisplays();
   }
   showToast('Semana zerada ✓');
@@ -1859,9 +1878,9 @@ function showToast(msg) {
 // INIT
 // ═══════════════════════════════════════════════════════════════════════════════
 (async()=>{
-  const{data:{session}}=await _supabase.auth.getSession();
-  if(session&&session.user){
-    currentUser=session.user;
+  const { data: { session } } = await _supabase.auth.getSession();
+  if(session && session.user){
+    currentUser = session.user;
     await fetchAllData();
     showSelector();
   } else {
