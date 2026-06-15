@@ -141,8 +141,8 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 
 <script>
 // URL e Credenciais corretas retiradas do seu código funcional
-const SUPABASE_URL = "https://lsbqqbjzrdobfwfakgvu.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzYnFxYmp6cmRvYmZ3ZmFrZ3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NTQ0OTMsImV4cCI6MjA5NzAutd00OTM3.wjgCNyV32gsbZ3MzZeJ6qm6le3UD5sMbrsIAjo0zKi4";
+const SUPABASE_URL = "https://zanyxygplgrzxgqmzzga.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inphbnl4eWdwbGdyenhncW16emdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1Mzc3MTgsImV4cCI6MjA5NzExMzcxOH0.p9SGdxn1TljSEo2ZahSU1PLupRY7TzSI7HD4GKlxROA";
 
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
@@ -244,7 +244,8 @@ async function handleLogin() {
     return;
   }
 
-  const emailVirtual = user.includes('@') ? user : `${user}@blackskull.local`;
+  const emailVirtual = user.includes('@') ? user : `${user}@gmail.com`;
+
   const { error } = await _supabase.auth.signInWithPassword({ email: emailVirtual, password });
 
   if (error) {
@@ -267,7 +268,8 @@ async function handleSignUp() {
     return;
   }
 
-  const emailVirtual = user.includes('@') ? user : `${user}@blackskull.local`;
+  const emailVirtual = user.includes('@') ? user : `${user}@gmail.com`;
+
   const { error } = await _supabase.auth.signUp({ email: emailVirtual, password });
 
   if (error) {
