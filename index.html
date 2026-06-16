@@ -537,6 +537,50 @@ header {
 .min-val.zero{color:var(--text-muted);}
 .min-val:focus{border-color:var(--amber);}
 
+.config-content { padding: 14px 16px 80px; }
+.config-top { margin-bottom: 10px; }
+.config-top-title { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px; color:var(--text); }
+.config-info { font-size:12px; color:var(--text-muted); margin-bottom:16px; line-height:1.6; }
+.config-section-title { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:2px; color:var(--amber); padding:10px 0 5px; border-bottom:1px solid var(--border); margin-bottom:8px; }
+.config-item { display:flex; justify-content:space-between; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin-bottom:5px; }
+.config-item-name { font-size:13px; flex:1; }
+.min-control { display:flex; align-items:center; gap:6px; }
+.min-btn { width:28px; height:28px; border-radius:6px; border:none; cursor:pointer; font-size:16px; font-weight:600; display:flex; align-items:center; justify-content:center; }
+.min-btn.minus { background:var(--red-dim); color:var(--red); }
+.min-btn.plus { background:var(--green-dim); color:var(--green); }
+.min-val { width:44px; text-align:center; background:var(--surface3); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:'DM Mono',monospace; font-size:15px; padding:3px; outline:none; -moz-appearance:textfield; }
+.min-val::-webkit-outer-spin-button,.min-val::-webkit-inner-spin-button{-webkit-appearance:none;}
+.min-val.zero{color:var(--text-muted);}
+.min-val:focus{border-color:var(--amber);}
+
+.cfg-item-row { display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:5px; gap:8px; }
+.cfg-item-name { flex:1; font-size:13px; color:var(--text); }
+.cfg-item-code { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted); margin-top:2px; }
+.cfg-del-btn { background:var(--red-dim); border:none; color:var(--red); border-radius:5px; width:26px; height:26px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.cfg-del-btn:active { opacity:0.6; }
+.cfg-add-row { display:flex; gap:6px; margin-top:8px; margin-bottom:14px; flex-wrap:wrap; }
+.cfg-add-input { flex:1; min-width:120px; padding:8px 12px; background:var(--surface); border:1px solid var(--border); border-radius:7px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; outline:none; transition:border-color .15s; }
+.cfg-add-input:focus { border-color:var(--amber); }
+.cfg-add-input::placeholder { color:var(--text-muted); }
+.cfg-add-btn { padding:8px 14px; background:var(--amber); border:none; color:#000; font-weight:700; border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; white-space:nowrap; }
+.cfg-add-btn:active { opacity:0.8; }
+.cfg-section-block { margin-bottom:22px; }
+.cfg-section-header { font-family:'Bebas Neue',cursive; font-size:15px; color:var(--amber); letter-spacing:1px; padding:10px 0 6px; border-bottom:1px solid var(--border); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+.cfg-new-cat-row { display:flex; gap:6px; margin-bottom:10px; }
+.cfg-tabs-wrap { padding:10px 16px 80px; }
+.cfg-page { display:none; }
+.cfg-page.active { display:block; }
+
+.item-edit-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:600; display:flex; align-items:center; justify-content:center; padding:20px; }
+.item-edit-modal { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:22px 20px; width:100%; max-width:340px; }
+.item-edit-title { font-family:'Bebas Neue',cursive; font-size:18px; color:var(--amber); letter-spacing:1px; margin-bottom:14px; }
+.item-edit-label { font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px; display:block; }
+.item-edit-input { width:100%; padding:9px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; outline:none; transition:border-color .15s; margin-bottom:12px; }
+.item-edit-input:focus { border-color:var(--amber); }
+.item-edit-btns { display:flex; gap:8px; margin-top:4px; }
+.item-edit-cancel { flex:1; padding:10px; background:transparent; border:1px solid var(--border); border-radius:7px; color:var(--text-muted); font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; }
+.item-edit-save { flex:1; padding:10px; background:var(--amber); border:none; border-radius:7px; color:#000; font-weight:700; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; }
+
 @media (max-width: 400px) {
   .status-cards, .analytics-grid { grid-template-columns: repeat(3,1fr); }
   .status-card .sc-num { font-size: 26px; }
@@ -593,6 +637,11 @@ header {
         <div class="app-card-icon">📊</div>
         <div class="app-card-name">Analytics</div>
         <div class="app-card-desc">Resumo geral de todos os estoques</div>
+      </div>
+      <div class="app-card" onclick="loadApp('config')" style="grid-column:1/-1;border-color:rgba(232,160,32,0.2)">
+        <div class="app-card-icon">⚙️</div>
+        <div class="app-card-name">Configurar Itens</div>
+        <div class="app-card-desc">Gerencie categorias e itens de bebidas, cervejas e alimentos</div>
       </div>
     </div>
   </div>
@@ -1092,6 +1141,16 @@ async function loadApp(app) {
     fab.style.display = 'none';
     tabBar.innerHTML = `<button class="tab-btn active">📊 Resumo Geral</button>`;
     renderAnalytics();
+
+  } else if (app === 'config') {
+    document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Configurações</span>';
+    weekBar.style.display = 'none';
+    fab.style.display = 'none';
+    tabBar.innerHTML = `
+      <button class="tab-btn active" onclick="setConfigTab('bebidas')">🥤 Bebidas</button>
+      <button class="tab-btn" onclick="setConfigTab('cervejas')">🍺 Cervejas</button>
+      <button class="tab-btn" onclick="setConfigTab('alimentos')">🍔 Alimentos</button>`;
+    renderConfig();
   }
 }
 
@@ -1314,7 +1373,47 @@ function exportCSVBebidas() {
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download=`estoque-bebidas-${semLabel}.csv`;a.click();
   showToast('CSV exportado ✓');
 }
-function exportPDFBebidas() { showToast('Gerando PDF…'); setTimeout(()=>showToast('PDF pronto ✓'),800); }
+function exportPDFBebidas() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
+  const stock = getResumoBebidas();
+  const now = new Date().toLocaleString('pt-BR');
+  doc.setFillColor(15,14,13); doc.rect(0,0,210,30,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(232,160,32);
+  doc.text('BLACK SKULL BIER — BEBIDAS', 14, 13);
+  doc.setFontSize(9); doc.setTextColor(180,175,168);
+  doc.text(`Semana: ${semLabel}   |   Gerado: ${now}`, 14, 21);
+  let y = 36;
+  CAT_BEBIDAS.forEach(cat => {
+    const items = cat.itens.map(it => {
+      const qty = stock[it.id]||0, min = bGetMin(it.id), st = itemStatus(qty,min);
+      return [String(it.id), it.nome, String(qty), min>0?String(min):'—', st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—'];
+    });
+    doc.autoTable({
+      startY: y,
+      head: [[{content: cat.nome, colSpan:5, styles:{fillColor:[34,33,32],textColor:[232,160,32],fontStyle:'bold',fontSize:9}}],
+             ['Cód.','Item','Qtd','Mín','Status']],
+      body: items,
+      theme: 'grid',
+      styles: {fontSize:8, cellPadding:2, textColor:[240,237,232], lineColor:[46,44,42], fillColor:[26,25,23]},
+      headStyles: {fillColor:[42,41,38], textColor:[138,135,128], fontSize:7.5, fontStyle:'bold'},
+      columnStyles: {0:{cellWidth:14,textColor:[100,97,92]},2:{cellWidth:14,halign:'center'},3:{cellWidth:14,halign:'center'},4:{cellWidth:22,halign:'center'}},
+      didParseCell: (d) => {
+        if(d.section==='body'&&d.column.index===4){
+          if(d.cell.raw==='Faltando'){d.cell.styles.textColor=[224,85,85];d.cell.styles.fontStyle='bold';}
+          else if(d.cell.raw==='Baixo'){d.cell.styles.textColor=[240,192,64];}
+          else if(d.cell.raw==='OK'){d.cell.styles.textColor=[76,175,111];}
+        }
+      },
+      margin: {left:14, right:14},
+    });
+    y = doc.lastAutoTable.finalY + 4;
+  });
+  doc.save(`bebidas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}.pdf`);
+  showToast('PDF exportado ✓');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP: CERVEJAS
@@ -1329,6 +1428,10 @@ function renderCervejas() {
     <div class="main no-weekbar" id="tab-resumo" style="display:none">
       <div class="resumo-wrap">
         <div class="week-select-wrap" id="resumoWeekBar"></div>
+        <div class="action-btns">
+          <button class="action-btn" onclick="exportCSVCervejas()">⬇ CSV</button>
+          <button class="action-btn" onclick="exportPDFCervejas()">📄 PDF</button>
+        </div>
         <div class="status-cards">
           <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Faltando</div></div>
           <div class="status-card low"><div class="sc-num" id="sc-low">0</div><div class="sc-label">Baixo</div></div>
@@ -1489,6 +1592,63 @@ async function adjMinCerveja(id,delta) {
   const inp=document.getElementById(`cmin-${id}`);if(inp){inp.value=nv;inp.classList.toggle('zero',nv===0);}
 }
 
+function exportCSVCervejas() {
+  const semLabel = resumoWeek==='all'?'Todas':`${resumoWeek}aSemana`;
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  const rows = [['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Status']];
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    const total = weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+    const d = weeks.length===1 ? cGetItemData(it.id,weeks[0]) : {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+    if(weeks.length>1) weeks.forEach(w=>{ const dd=cGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
+    const min=cGetMin(it.id),st=itemStatus(total,min);
+    rows.push([it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—']);
+  }));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download=`estoque-cervejas-${semLabel}.csv`;a.click();
+  showToast('CSV exportado ✓');
+}
+
+function exportPDFCervejas() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  const now = new Date().toLocaleString('pt-BR');
+  doc.setFillColor(15,14,13); doc.rect(0,0,297,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(232,160,32);
+  doc.text('BLACK SKULL BIER — CERVEJAS', 14, 12);
+  doc.setFontSize(9); doc.setTextColor(180,175,168);
+  doc.text(`Semana: ${semLabel}   |   Gerado: ${now}`, 14, 21);
+  const rows = [];
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    const total = weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+    const d = {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+    weeks.forEach(w=>{ const dd=cGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
+    const min=cGetMin(it.id),st=itemStatus(total,min);
+    rows.push([it.nome, cat.nome, String(total), String(d.estoque), String(d.piscina), String(d.gel_ext), String(d.bar), String(d.camara), min>0?String(min):'—', st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—']);
+  }));
+  doc.autoTable({
+    startY: 34,
+    head: [['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Status']],
+    body: rows,
+    theme: 'grid',
+    styles: {fontSize:8, cellPadding:2, textColor:[240,237,232], lineColor:[46,44,42], fillColor:[26,25,23]},
+    headStyles: {fillColor:[42,41,38], textColor:[232,160,32], fontSize:8, fontStyle:'bold'},
+    columnStyles: {2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'},9:{halign:'center'}},
+    didParseCell: (d) => {
+      if(d.section==='body'&&d.column.index===9){
+        if(d.cell.raw==='Faltando'){d.cell.styles.textColor=[224,85,85];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='Baixo'){d.cell.styles.textColor=[240,192,64];}
+        else if(d.cell.raw==='OK'){d.cell.styles.textColor=[76,175,111];}
+      }
+    },
+    margin:{left:14,right:14},
+  });
+  doc.save(`cervejas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}.pdf`);
+  showToast('PDF exportado ✓');
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP: ALIMENTOS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1507,6 +1667,7 @@ function buildFoodHTML() {
         <div style="font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:2px">Resumo</div>
         <div style="display:flex;gap:6px">
           <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportCSVAlimentos()">⬇ CSV</button>
+          <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportPDFAlimentos()">📄 PDF</button>
         </div>
       </div>
       <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px" id="food-resumo-week-tabs"></div>
@@ -1700,6 +1861,163 @@ function exportCSVAlimentos() {
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download='estoque-alimentos.csv';a.click();
   showToast('CSV exportado ✓');
+}
+
+function exportPDFAlimentos() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW = 210;
+  const margin = 14;
+  const colW = pageW - margin * 2;
+
+  // Calcular dados
+  const weeks = foodResumoWeek===5 ? [0,1,2,3,4] : [foodResumoWeek];
+  const semLabel = foodResumoWeek===5 ? 'Todas as Semanas' : `${foodResumoWeek+1}ª Semana`;
+  const agg = {};
+  weeks.forEach(w => Object.entries(DB.alimentos.counts[w]).forEach(([item,val]) => { if(val>0) agg[item]=(agg[item]||0)+val; }));
+  const allWithMin = [];
+  CAT_ALIMENTOS.forEach(cat => cat.items.forEach(item => { if(aGetMin(item)>0) allWithMin.push(item); }));
+  const missing = [], low = [], okList = [];
+  allWithMin.forEach(item => {
+    const qty=agg[item]||0, min=aGetMin(item);
+    if(qty<min) missing.push({item,qty,min,falta:min-qty});
+    else if(qty<=min*1.5) low.push({item,qty,min});
+    else okList.push({item,qty,min});
+  });
+  const totalQty = Object.values(agg).reduce((s,v)=>s+v,0);
+  const now = new Date().toLocaleString('pt-BR');
+
+  // ── CABEÇALHO ──────────────────────────────────────────────────
+  doc.setFillColor(15,14,13);
+  doc.rect(0, 0, pageW, 28, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO DE ESTOQUE', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  // ── CARDS RESUMO ───────────────────────────────────────────────
+  let y = 34;
+  const cardW = (colW - 8) / 3;
+  const cards = [
+    { label:'FALTANDO', num: missing.length, r:220, g:60,  b:60  },
+    { label:'BAIXO',    num: low.length,     r:220, g:170, b:40  },
+    { label:'OK',       num: okList.length,  r:60,  g:175, b:100 },
+  ];
+  cards.forEach((c, i) => {
+    const cx = margin + i*(cardW+4);
+    doc.setFillColor(245,245,245); doc.setDrawColor(220,220,220);
+    doc.roundedRect(cx, y, cardW, 18, 2, 2, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(c.r,c.g,c.b);
+    doc.text(String(c.num), cx + cardW/2, y+11, {align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text(c.label, cx + cardW/2, y+16.5, {align:'center'});
+  });
+  y += 26;
+
+  // helper para seção título
+  function sectionTitle(title, r, g, b) {
+    doc.setFillColor(r, g, b);
+    doc.rect(margin, y, colW, 7, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+    doc.text(title, margin+3, y+4.8);
+    y += 9;
+  }
+
+  // ── FALTANDO ───────────────────────────────────────────────────
+  if (missing.length) {
+    sectionTitle('FALTANDO / ABAIXO DO MINIMO', 210, 60, 60);
+    doc.autoTable({
+      startY: y,
+      head: [['Item','Qtd em estoque','Mínimo','Falta']],
+      body: missing.map(({item,qty,min,falta}) => [item, String(qty), String(min), String(falta)]),
+      theme: 'grid',
+      styles: { fontSize:8, cellPadding:2, textColor:[30,30,30], lineColor:[200,200,200], fillColor:[255,255,255] },
+      headStyles: { fillColor:[240,240,240], textColor:[80,80,80], fontSize:7.5, fontStyle:'bold' },
+      columnStyles: { 1:{halign:'center'}, 2:{halign:'center'}, 3:{halign:'center',textColor:[210,60,60],fontStyle:'bold'} },
+      margin: { left:margin, right:margin },
+    });
+    y = doc.lastAutoTable.finalY + 5;
+  }
+
+  // ── BAIXO ──────────────────────────────────────────────────────
+  if (low.length) {
+    sectionTitle('ESTOQUE BAIXO', 190, 140, 30);
+    doc.autoTable({
+      startY: y,
+      head: [['Item','Qtd em estoque','Mínimo']],
+      body: low.map(({item,qty,min}) => [item, String(qty), String(min)]),
+      theme: 'grid',
+      styles: { fontSize:8, cellPadding:2, textColor:[30,30,30], lineColor:[200,200,200], fillColor:[255,255,255] },
+      headStyles: { fillColor:[240,240,240], textColor:[80,80,80], fontSize:7.5, fontStyle:'bold' },
+      columnStyles: { 1:{halign:'center',textColor:[190,140,30],fontStyle:'bold'}, 2:{halign:'center'} },
+      margin: { left:margin, right:margin },
+    });
+    y = doc.lastAutoTable.finalY + 5;
+  }
+
+  // ── CONTAGEM COMPLETA ──────────────────────────────────────────
+  const hasData = Object.values(agg).some(v=>v>0);
+  if (hasData) {
+    sectionTitle('CONTAGEM COMPLETA', 50, 50, 50);
+    // Montar rows agrupadas por categoria com sub-header
+    const body = [];
+    const didParseCell_fn = [];
+    const catHeaderRows = new Set();
+    let rowIdx = 0;
+    CAT_ALIMENTOS.forEach(cat => {
+      const counted = cat.items.filter(i => agg[i]>0 || aGetMin(i)>0);
+      if (!counted.length) return;
+      catHeaderRows.add(rowIdx);
+      body.push([{ content: cat.name, colSpan:3, styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5} }]);
+      rowIdx++;
+      counted.forEach(item => {
+        const qty=agg[item]||0, min=aGetMin(item), st=itemStatus(qty,min);
+        const stLabel = st==='missing'?'FALTA':st==='low'?'BAIXO':st==='ok'?'OK':'—';
+        body.push([item, String(qty), stLabel]);
+        rowIdx++;
+      });
+    });
+    doc.autoTable({
+      startY: y,
+      head: [['Item','Quantidade','Status']],
+      body: body,
+      theme: 'grid',
+      styles: { fontSize:8, cellPadding:2, textColor:[30,30,30], lineColor:[200,200,200], fillColor:[255,255,255] },
+      headStyles: { fillColor:[240,240,240], textColor:[80,80,80], fontSize:7.5, fontStyle:'bold' },
+      columnStyles: { 1:{halign:'center'}, 2:{halign:'center'} },
+      didParseCell: (d) => {
+        if(d.section==='body' && d.column.index===2) {
+          if(d.cell.raw==='FALTA'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+          else if(d.cell.raw==='BAIXO'){d.cell.styles.textColor=[190,140,30];d.cell.styles.fontStyle='bold';}
+          else if(d.cell.raw==='OK'){d.cell.styles.textColor=[60,160,90];}
+        }
+      },
+      margin: { left:margin, right:margin },
+    });
+    y = doc.lastAutoTable.finalY + 5;
+  }
+
+  // ── TOTAL ──────────────────────────────────────────────────────
+  doc.setFillColor(240,240,240); doc.setDrawColor(200,200,200);
+  doc.rect(margin, y, colW, 9, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+  doc.text('TOTAL', margin+3, y+6);
+  doc.text(String(totalQty), pageW-margin-3, y+6, {align:'right'});
+  y += 12;
+
+  // ── RODAPÉ ──────────────────────────────────────────────────────
+  const pgCount = doc.getNumberOfPages();
+  for (let i=1; i<=pgCount; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Controle de Estoque', margin, 290);
+    doc.text(`Pagina ${i} / ${pgCount}`, pageW-margin, 290, {align:'right'});
+  }
+
+  const nomeArq = `alimentos-${foodResumoWeek===5?'todas':(foodResumoWeek+1)+'sem'}.pdf`;
+  doc.save(nomeArq);
+  showToast('PDF exportado ✓');
 }
 
 function buildFoodConfig() {
@@ -1973,6 +2291,150 @@ function showToast(msg) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// APP: CONFIGURAÇÕES DE ITENS
+// ═══════════════════════════════════════════════════════════════════════════════
+let configActiveTab = 'bebidas';
+
+function renderConfig() {
+  document.getElementById('appContent').innerHTML = `
+    <div class="cfg-tabs-wrap">
+      <div id="cfg-page-bebidas" class="cfg-page active"></div>
+      <div id="cfg-page-cervejas" class="cfg-page"></div>
+      <div id="cfg-page-alimentos" class="cfg-page"></div>
+    </div>`;
+  setConfigTab('bebidas');
+}
+
+function setConfigTab(tab) {
+  configActiveTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i === ['bebidas','cervejas','alimentos'].indexOf(tab)));
+  document.querySelectorAll('.cfg-page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById(`cfg-page-${tab}`);
+  if (page) { page.classList.add('active'); buildConfigPage(tab); }
+}
+
+function buildConfigPage(type) {
+  const page = document.getElementById(`cfg-page-${type}`);
+  if (!page) return;
+  page.innerHTML = '';
+
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const itemsKey = (type === 'alimentos') ? 'items' : 'itens';
+  const nameKey = (type === 'alimentos') ? 'name' : 'nome';
+
+  // Adicionar nova categoria
+  const newCatRow = document.createElement('div');
+  newCatRow.className = 'cfg-new-cat-row';
+  newCatRow.innerHTML = `
+    <input class="cfg-add-input" id="cfg-new-cat-${type}" placeholder="Nova categoria…" style="flex:1">
+    <button class="cfg-add-btn" onclick="addCfgCategory('${type}')">+ Categoria</button>`;
+  page.appendChild(newCatRow);
+
+  cats.forEach((cat, catIdx) => {
+    const block = document.createElement('div');
+    block.className = 'cfg-section-block';
+    block.id = `cfg-cat-block-${type}-${catIdx}`;
+
+    const header = document.createElement('div');
+    header.className = 'cfg-section-header';
+    header.innerHTML = `
+      <span>${cat[nameKey]}</span>
+      <button class="cfg-del-btn" title="Remover categoria" onclick="removeCfgCategory('${type}',${catIdx})" style="background:rgba(224,85,85,0.15);color:var(--red);border-radius:5px;border:none;padding:2px 8px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600">🗑 Remover cat.</button>`;
+    block.appendChild(header);
+
+    const items = cat[itemsKey] || [];
+    items.forEach((it, itIdx) => {
+      const isObj = typeof it === 'object';
+      const displayName = isObj ? it.nome : it;
+      const row = document.createElement('div');
+      row.className = 'cfg-item-row';
+      row.id = `cfg-item-${type}-${catIdx}-${itIdx}`;
+      row.innerHTML = `
+        <div style="flex:1;min-width:0">
+          <div class="cfg-item-name">${displayName}</div>
+          ${isObj && it.id ? `<div class="cfg-item-code">#${it.id}</div>` : ''}
+        </div>
+        <button class="cfg-del-btn" onclick="removeCfgItem('${type}',${catIdx},${itIdx})">✕</button>`;
+      block.appendChild(row);
+    });
+
+    // Linha para adicionar item
+    const addRow = document.createElement('div');
+    addRow.className = 'cfg-add-row';
+    if (type === 'bebidas') {
+      addRow.innerHTML = `
+        <input class="cfg-add-input" id="cfg-add-id-${type}-${catIdx}" placeholder="ID (número)" type="number" style="max-width:90px">
+        <input class="cfg-add-input" id="cfg-add-name-${type}-${catIdx}" placeholder="Nome do item…">
+        <button class="cfg-add-btn" onclick="addCfgItem('${type}',${catIdx})">+ Item</button>`;
+    } else {
+      addRow.innerHTML = `
+        <input class="cfg-add-input" id="cfg-add-name-${type}-${catIdx}" placeholder="Nome do item…">
+        <button class="cfg-add-btn" onclick="addCfgItem('${type}',${catIdx})">+ Item</button>`;
+    }
+    block.appendChild(addRow);
+    page.appendChild(block);
+  });
+}
+
+function addCfgCategory(type) {
+  const inp = document.getElementById(`cfg-new-cat-${type}`);
+  const name = (inp?.value || '').trim();
+  if (!name) { showToast('Digite o nome da categoria'); return; }
+  if (type === 'bebidas') CAT_BEBIDAS.push({ nome: name, itens: [] });
+  else if (type === 'cervejas') CAT_CERVEJAS.push({ nome: name, itens: [] });
+  else CAT_ALIMENTOS.push({ name: name, items: [] });
+  inp.value = '';
+  buildConfigPage(type);
+  showToast(`Categoria "${name}" adicionada ✓`);
+}
+
+function removeCfgCategory(type, catIdx) {
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const nameKey = type === 'alimentos' ? 'name' : 'nome';
+  const cat = cats[catIdx];
+  if (!cat) return;
+  const catName = cat[nameKey];
+  // Verificar se tem itens
+  const items = (type === 'alimentos' ? cat.items : cat.itens) || [];
+  if (items.length > 0 && !confirm(`A categoria "${catName}" tem ${items.length} item(s). Remover mesmo assim?`)) return;
+  cats.splice(catIdx, 1);
+  buildConfigPage(type);
+  showToast(`Categoria removida ✓`);
+}
+
+function addCfgItem(type, catIdx) {
+  const nameInp = document.getElementById(`cfg-add-name-${type}-${catIdx}`);
+  const name = (nameInp?.value || '').trim();
+  if (!name) { showToast('Digite o nome do item'); return; }
+
+  if (type === 'bebidas') {
+    const idInp = document.getElementById(`cfg-add-id-bebidas-${catIdx}`);
+    const id = parseInt(idInp?.value);
+    if (!id) { showToast('Digite o ID numérico do item'); return; }
+    const exists = CAT_BEBIDAS.some(c => c.itens.some(i => String(i.id) === String(id)));
+    if (exists) { showToast('ID já existe em outra categoria'); return; }
+    CAT_BEBIDAS[catIdx].itens.push({ id, nome: name });
+    if (idInp) idInp.value = '';
+  } else if (type === 'cervejas') {
+    const slugId = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+    CAT_CERVEJAS[catIdx].itens.push({ id: slugId, nome: name });
+  } else {
+    CAT_ALIMENTOS[catIdx].items.push(name);
+  }
+  nameInp.value = '';
+  buildConfigPage(type);
+  showToast(`"${name}" adicionado ✓`);
+}
+
+function removeCfgItem(type, catIdx, itIdx) {
+  if (type === 'bebidas') CAT_BEBIDAS[catIdx].itens.splice(itIdx, 1);
+  else if (type === 'cervejas') CAT_CERVEJAS[catIdx].itens.splice(itIdx, 1);
+  else CAT_ALIMENTOS[catIdx].items.splice(itIdx, 1);
+  buildConfigPage(type);
+  showToast('Item removido ✓');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // REALTIME — escuta mudanças feitas por outros dispositivos/usuários e atualiza a UI
 // ═══════════════════════════════════════════════════════════════════════════════
 function setupRealtime() {
@@ -2004,6 +2466,8 @@ function refreshCurrentView() {
     else if (foodActiveTab==='config') buildFoodConfig();
   } else if (currentApp === 'analytics') {
     buildAnalyticsBody();
+  } else if (currentApp === 'config') {
+    buildConfigPage(configActiveTab);
   }
 }
 
