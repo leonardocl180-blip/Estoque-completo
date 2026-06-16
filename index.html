@@ -2137,16 +2137,41 @@ function openFoodModal(item,row,display) {
   setTimeout(()=>document.getElementById('food-modal-input').focus(),50);
 }
 function closeFoodModal() { document.getElementById('foodModal').style.display='none'; _foodModalItem=null; }
+
+// Debounce de 10s por item (evita somas duplicadas em cliques repetidos/duplo toque)
+const _FOOD_DEBOUNCE_MS = 10000;
+let _foodLastConfirmAt = {}; // chave: nome do item -> timestamp
+let _foodConfirmInFlight = false; // trava de reentrância enquanto o modal está processando
+
 async function confirmFoodModal() {
   if(!_foodModalItem) return;
-  const add=Math.max(0,parseInt(document.getElementById('food-modal-input').value)||0);
-  if(add>0){
-    const nv=aGetCount(_foodModalItem,foodCurrentWeek)+add;
-    await aSetCount(_foodModalItem,foodCurrentWeek,nv);
-    if(_foodModalDisplay){_foodModalDisplay.value=nv;_foodModalDisplay.className='count-display';}
-    if(_foodModalRow) updateFoodRowStatus(_foodModalItem,_foodModalRow,nv);
+  if(_foodConfirmInFlight) return; // já está processando uma confirmação, ignora cliques extras
+
+  const item=_foodModalItem, row=_foodModalRow, display=_foodModalDisplay;
+  const now=Date.now();
+  const last=_foodLastConfirmAt[item]||0;
+  if(now-last < _FOOD_DEBOUNCE_MS){
+    showToast(`Aguarde ${Math.ceil((_FOOD_DEBOUNCE_MS-(now-last))/1000)}s para somar este item novamente`);
+    closeFoodModal();
+    return;
   }
+
+  const add=Math.max(0,parseInt(document.getElementById('food-modal-input').value)||0);
+  if(add<=0){ closeFoodModal(); return; }
+
+  _foodConfirmInFlight=true;
+  _foodLastConfirmAt[item]=now;
+  // Fecha o modal imediatamente (UI otimista) para que ele não fique "preso" aberto
+  // enquanto a chamada assíncrona de salvamento ainda está em andamento.
   closeFoodModal();
+  try {
+    const nv=aGetCount(item,foodCurrentWeek)+add;
+    await aSetCount(item,foodCurrentWeek,nv);
+    if(display){display.value=nv;display.className='count-display';}
+    if(row) updateFoodRowStatus(item,row,nv);
+  } finally {
+    _foodConfirmInFlight=false;
+  }
 }
 
 function buildFoodResumo() {
@@ -2664,28 +2689,55 @@ function openPopover(evt, id, mode, app, locTarget) {
   setTimeout(()=>inp.focus(),50);
 }
 function closePopover() { document.getElementById('adjPopover').classList.remove('show'); _popoverId=null; }
+
+// Debounce de 10s por item (evita somas duplicadas em cliques repetidos/duplo toque)
+const _ADJ_DEBOUNCE_MS = 10000;
+let _adjLastConfirmAt = {}; // chave: `${app}:${locTarget}:${id}` -> timestamp
+let _adjConfirmInFlight = false; // trava de reentrância enquanto o popover está processando
+
 async function confirmAdj() {
   if(_popoverId===null) return;
+  if(_adjConfirmInFlight) return; // já está processando uma confirmação, ignora cliques extras
+
+  const app=_popoverApp, locTarget=_popoverLocTarget, id=_popoverId;
+  const debounceKey=`${app}:${locTarget}:${id}`;
+  const now=Date.now();
+  const last=_adjLastConfirmAt[debounceKey]||0;
+  if(now-last < _ADJ_DEBOUNCE_MS){
+    showToast(`Aguarde ${Math.ceil((_ADJ_DEBOUNCE_MS-(now-last))/1000)}s para somar este item novamente`);
+    closePopover();
+    return;
+  }
+
   const val=parseInt(document.getElementById('adjPopoverInput').value)||0;
   if(val<=0){closePopover();return;}
   const delta=_popoverMode==='plus'?val:-val;
-  if(_popoverApp==='b'){
-    const cur=bGetQty(_popoverId,currentWeek);
-    await bSetQty(_popoverId,currentWeek,Math.max(0,cur+delta));
-    refreshCardBebida(_popoverId);
-  } else if(_popoverApp==='c') {
-    if(_popoverLocTarget==='total'){
-      const d=cGetItemData(_popoverId,currentWeek);
-      d.estoque=Math.max(0,(d.estoque||0)+delta);
-      await cSetItemData(_popoverId,currentWeek,d);
-    } else {
-      const d=cGetItemData(_popoverId,currentWeek);
-      d[_popoverLocTarget]=Math.max(0,(d[_popoverLocTarget]||0)+delta);
-      await cSetItemData(_popoverId,currentWeek,d);
-    }
-    refreshCardCerveja(_popoverId);
-  }
+
+  _adjConfirmInFlight=true;
+  _adjLastConfirmAt[debounceKey]=now;
+  // Fecha o popover imediatamente (UI otimista) para que ele não fique "preso" aberto
+  // enquanto a chamada assíncrona de salvamento ainda está em andamento.
   closePopover();
+  try {
+    if(app==='b'){
+      const cur=bGetQty(id,currentWeek);
+      await bSetQty(id,currentWeek,Math.max(0,cur+delta));
+      refreshCardBebida(id);
+    } else if(app==='c') {
+      if(locTarget==='total'){
+        const d=cGetItemData(id,currentWeek);
+        d.estoque=Math.max(0,(d.estoque||0)+delta);
+        await cSetItemData(id,currentWeek,d);
+      } else {
+        const d=cGetItemData(id,currentWeek);
+        d[locTarget]=Math.max(0,(d[locTarget]||0)+delta);
+        await cSetItemData(id,currentWeek,d);
+      }
+      refreshCardCerveja(id);
+    }
+  } finally {
+    _adjConfirmInFlight=false;
+  }
 }
 function refreshCardCerveja(id) {
   const total=cGetTotal(id,currentWeek),min=cGetMin(id),st=itemStatus(total,min);
