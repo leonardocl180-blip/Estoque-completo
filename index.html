@@ -718,6 +718,161 @@ let currentUser = null;
 let currentApp = null;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// OFFLINE / SINCRONIZAÇÃO
+//   -> Os botões de contagem continuam funcionando sem Internet: o valor é
+//      aplicado na memória (DB) e numa "fila" salva no localStorage.
+//   -> Cada operação pendente é guardada com uma CHAVE única (usuário + tipo +
+//      semana + item), não uma lista que cresce: se o mesmo item for alterado
+//      várias vezes offline, só o valor mais recente fica na fila — evitando
+//      comandos duplicados quando a conexão voltar.
+//   -> Quando a internet volta ('online', timer, ou app volta ao primeiro
+//      plano), a fila é enviada ao Supabase automaticamente.
+// ═══════════════════════════════════════════════════════════════════════════════
+let isOnline = navigator.onLine;
+let _flushingQueue = false;
+let _realtimeChannel = null;
+
+function lsKey(name) { return `bsb_${name}_${currentUser ? currentUser.id : 'anon'}`; }
+
+function loadQueue() {
+  try { return JSON.parse(localStorage.getItem(lsKey('offline_queue')) || '{}'); }
+  catch (e) { console.error('loadQueue:', e); return {}; }
+}
+function saveQueue(q) {
+  try { localStorage.setItem(lsKey('offline_queue'), JSON.stringify(q)); }
+  catch (e) { console.error('saveQueue:', e); }
+}
+function queueSize() { return Object.keys(loadQueue()).length; }
+
+// Guarda/atualiza uma operação pendente. A "key" identifica O QUE está sendo
+// alterado (não quando), então repetir a mesma alteração só sobrescreve a
+// entrada — nunca duplica.
+function queueOperation(key, entry) {
+  const q = loadQueue();
+  q[key] = Object.assign({}, entry, {
+    ts: Date.now(),
+    user_id: currentUser ? currentUser.id : null
+  });
+  saveQueue(q);
+  updateOfflineBanner();
+}
+function removeFromQueue(key) {
+  const q = loadQueue();
+  if (q[key]) { delete q[key]; saveQueue(q); updateOfflineBanner(); }
+}
+
+// Snapshot local de DB + catálogos, para a tela não ficar vazia se o usuário
+// recarregar a página estando offline.
+function saveLocalSnapshot() {
+  try {
+    localStorage.setItem(lsKey('snapshot'), JSON.stringify({
+      DB, CAT_BEBIDAS, CAT_CERVEJAS, CAT_ALIMENTOS, ts: Date.now()
+    }));
+  } catch (e) { console.error('saveLocalSnapshot:', e); }
+}
+function loadLocalSnapshot() {
+  try {
+    const raw = localStorage.getItem(lsKey('snapshot'));
+    if (!raw) return false;
+    const snap = JSON.parse(raw);
+    if (snap.DB) DB = snap.DB;
+    if (Array.isArray(snap.CAT_BEBIDAS)) { CAT_BEBIDAS.length = 0; CAT_BEBIDAS.push(...snap.CAT_BEBIDAS); }
+    if (Array.isArray(snap.CAT_CERVEJAS)) { CAT_CERVEJAS.length = 0; CAT_CERVEJAS.push(...snap.CAT_CERVEJAS); }
+    if (Array.isArray(snap.CAT_ALIMENTOS)) { CAT_ALIMENTOS.length = 0; CAT_ALIMENTOS.push(...snap.CAT_ALIMENTOS); }
+    return true;
+  } catch (e) { console.error('loadLocalSnapshot:', e); return false; }
+}
+
+// Roda uma chamada do Supabase com um prazo máximo, para o botão nunca "travar"
+// esperando uma rede lenta/instável — se passar do tempo, trata como offline.
+function withTimeout(thenable, ms = 6000) {
+  return new Promise(resolve => {
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; resolve({ data: null, error: { message: 'timeout' } }); } }, ms);
+    Promise.resolve(thenable).then(
+      res => { if (!done) { done = true; clearTimeout(t); resolve(res); } },
+      err => { if (!done) { done = true; clearTimeout(t); resolve({ data: null, error: err || { message: 'network error' } }); } }
+    );
+  });
+}
+
+function handleConnectivityDrop() {
+  if (isOnline) { isOnline = false; if (currentUser) showToast('📡 Sem conexão — salvando localmente'); }
+  updateOfflineBanner();
+}
+
+// Pequeno aviso fixo no rodapé mostrando status/itens pendentes.
+function updateOfflineBanner() {
+  const pending = queueSize();
+  let el = document.getElementById('offline-banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'offline-banner';
+    el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:8px 14px;font-size:12px;text-align:center;font-family:"DM Sans",sans-serif;font-weight:600;color:#fff;cursor:pointer;';
+    el.onclick = () => { if (navigator.onLine) flushPendingQueue(); else showToast('Ainda sem conexão'); };
+    document.body.appendChild(el);
+  }
+  if (!navigator.onLine || pending > 0) {
+    el.style.display = 'block';
+    el.style.background = !navigator.onLine ? '#c0392b' : '#e8a020';
+    el.textContent = !navigator.onLine
+      ? `📡 Sem conexão — ${pending} alteração(ões) pendente(s) (toque para tentar)`
+      : `🔄 Sincronizando ${pending} alteração(ões)…`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// Envia para o Supabase tudo o que ficou pendente enquanto estava offline.
+async function flushPendingQueue() {
+  if (_flushingQueue || !currentUser || !navigator.onLine) return;
+  _flushingQueue = true;
+  const q = loadQueue();
+  const keys = Object.keys(q);
+  let syncedCount = 0;
+  for (const key of keys) {
+    const entry = q[key];
+    let error = null;
+    if (entry.op === 'upsert') {
+      const res = await withTimeout(_supabase.from(entry.table).upsert(entry.payload, { onConflict: entry.conflict }));
+      error = res.error;
+    } else if (entry.op === 'delete') {
+      let builder = _supabase.from(entry.table).delete().match(entry.match);
+      if (entry.in) builder = builder.in(entry.in.col, entry.in.values);
+      const res = await withTimeout(builder);
+      error = res.error;
+    }
+    if (error) { console.error('flushPendingQueue:', entry, error); break; } // ainda offline/falhou: tenta o resto depois
+    delete q[key];
+    syncedCount++;
+  }
+  saveQueue(q);
+  _flushingQueue = false;
+  updateOfflineBanner();
+  if (syncedCount > 0) {
+    showToast(`✅ ${syncedCount} alteração(ões) sincronizada(s)`);
+    await fetchAllData();
+    await fetchCatalogConfig();
+    refreshCurrentView();
+  }
+}
+
+window.addEventListener('online', () => {
+  isOnline = true;
+  if (currentUser) { showToast('✅ Conexão restabelecida — sincronizando…'); setupRealtime(); flushPendingQueue(); }
+  updateOfflineBanner();
+});
+window.addEventListener('offline', () => {
+  isOnline = false;
+  if (currentUser) showToast('📡 Sem conexão — as alterações serão salvas localmente');
+  updateOfflineBanner();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && navigator.onLine && currentUser) flushPendingQueue();
+});
+setInterval(() => { if (navigator.onLine && currentUser) flushPendingQueue(); }, 25000);
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // AUTH
 //   -> usamos o Supabase Auth padrão (auth.users) para login/senha,
 //      e a tabela public.app_users só para vincular username -> usuário (perfil).
@@ -732,6 +887,7 @@ async function checkUser() {
     await fetchCatalogConfig();
     showSelector();
     setupRealtime();
+    updateOfflineBanner();
   } else {
     currentUser = null;
     showLogin();
@@ -742,6 +898,7 @@ async function checkUser() {
 // (username = parte local do email, ex: "joao" para "joao@blackskull.local")
 async function ensureAppUserProfile() {
   if (!currentUser) return;
+  if (!navigator.onLine) return;
   const username = (currentUser.email || '').split('@')[0].toLowerCase();
   try {
     const { data: existing, error: selErr } = await _supabase
@@ -858,12 +1015,25 @@ async function fetchAllData() {
   if (!currentUser) return;
   DB = emptyDB();
 
-  const { data: rows, error } = await _supabase
-    .from('inventory_records')
-    .select('app_type,week_label,item_id,item_name,category_name,qty,min_qty')
-    .eq('user_id', currentUser.id);
+  if (!navigator.onLine) {
+    loadLocalSnapshot();
+    updateOfflineBanner();
+    return;
+  }
 
-  if (error) { console.error('fetchAllData inventory_records:', error); return; }
+  const { data: rows, error } = await withTimeout(
+    _supabase
+      .from('inventory_records')
+      .select('app_type,week_label,item_id,item_name,category_name,qty,min_qty')
+      .eq('user_id', currentUser.id)
+  );
+
+  if (error) {
+    console.error('fetchAllData inventory_records:', error);
+    loadLocalSnapshot();
+    handleConnectivityDrop();
+    return;
+  }
   if (!rows) return;
 
   rows.forEach(r => {
@@ -897,6 +1067,8 @@ async function fetchAllData() {
       }
     }
   });
+
+  saveLocalSnapshot();
 }
 
 function weekLabelToNum(label) {
@@ -904,17 +1076,33 @@ function weekLabelToNum(label) {
   return m ? parseInt(m[1]) : null;
 }
 
+// rec: {app_type, week_label, item_id, item_name, category_name, qty, min_qty}
+// Funciona offline: aplica local e guarda na fila de sincronização; quando a
+// internet voltar, flushPendingQueue() reenvia automaticamente.
 async function upsertRecord(rec) {
-  // rec: {app_type, week_label, item_id, item_name, category_name, qty, min_qty}
   const payload = Object.assign({
     user_id: currentUser.id,
     qty: 0,
     min_qty: 0
   }, rec);
-  const { error } = await _supabase
-    .from('inventory_records')
-    .upsert(payload, { onConflict: 'app_type,week_label,item_id,user_id' });
-  if (error) { console.error('upsertRecord error:', error, payload); showToast('⚠️ Erro ao salvar!'); }
+  const key = `inv:${payload.app_type}:${payload.week_label}:${payload.item_id}`;
+  saveLocalSnapshot();
+
+  if (!navigator.onLine) {
+    queueOperation(key, { table: 'inventory_records', op: 'upsert', payload, conflict: 'app_type,week_label,item_id,user_id' });
+    return;
+  }
+
+  const { error } = await withTimeout(
+    _supabase.from('inventory_records').upsert(payload, { onConflict: 'app_type,week_label,item_id,user_id' })
+  );
+  if (error) {
+    console.error('upsertRecord error:', error, payload);
+    queueOperation(key, { table: 'inventory_records', op: 'upsert', payload, conflict: 'app_type,week_label,item_id,user_id' });
+    handleConnectivityDrop();
+  } else {
+    removeFromQueue(key);
+  }
 }
 
 // ─── BEBIDAS helpers ──────────────────────────────────────────────────────────
@@ -2533,34 +2721,48 @@ function showClearModal() {
   document.getElementById('clearModal').classList.add('show');
 }
 function hideModal() { document.getElementById('clearModal').classList.remove('show'); }
+
+// Apaga registros funcionando offline (mesma lógica de fila/chave do upsertRecord).
+async function deleteRecordsOffline(key, match, idsField, ids) {
+  saveLocalSnapshot();
+  if (!navigator.onLine) {
+    queueOperation(key, { table: 'inventory_records', op: 'delete', match, in: { col: idsField, values: ids } });
+    return;
+  }
+  const { error } = await withTimeout(
+    _supabase.from('inventory_records').delete().match(match).in(idsField, ids)
+  );
+  if (error) {
+    console.error('deleteRecordsOffline:', error);
+    queueOperation(key, { table: 'inventory_records', op: 'delete', match, in: { col: idsField, values: ids } });
+    handleConnectivityDrop();
+  } else {
+    removeFromQueue(key);
+  }
+}
+
 async function clearWeek() {
   hideModal();
   if(currentApp==='bebidas'){
     const week = currentWeek;
     DB.bebidas.stock[week]={};
     const ids = CAT_BEBIDAS.flatMap(cat=>cat.itens.map(it=>String(it.id)));
-    const { error } = await _supabase.from('inventory_records').delete()
-      .match({ user_id: currentUser.id, app_type: 'bebidas', week_label: WEEK_LABELS[week] })
-      .in('item_id', ids);
-    if(error) console.error('clearWeek bebidas:', error);
+    await deleteRecordsOffline(`del:bebidas:${WEEK_LABELS[week]}`,
+      { user_id: currentUser.id, app_type: 'bebidas', week_label: WEEK_LABELS[week] }, 'item_id', ids);
     renderContarBebidas();
   } else if(currentApp==='cervejas'){
     const week = currentWeek;
     DB.cervejas.stock[week]={};
     const itemIds=[];
     CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>LOCAIS.forEach(loc=>itemIds.push(`${it.id}__${loc.id}`))));
-    const { error } = await _supabase.from('inventory_records').delete()
-      .match({ user_id: currentUser.id, app_type: 'cervejas', week_label: WEEK_LABELS[week] })
-      .in('item_id', itemIds);
-    if(error) console.error('clearWeek cervejas:', error);
+    await deleteRecordsOffline(`del:cervejas:${WEEK_LABELS[week]}`,
+      { user_id: currentUser.id, app_type: 'cervejas', week_label: WEEK_LABELS[week] }, 'item_id', itemIds);
     renderContarCervejas();
   } else if(currentApp==='alimentos'){
     DB.alimentos.counts[foodCurrentWeek]={};
     const items = CAT_ALIMENTOS.flatMap(cat=>cat.items);
-    const { error } = await _supabase.from('inventory_records').delete()
-      .match({ user_id: currentUser.id, app_type: 'alimentos', week_label: WEEK_LABELS[foodCurrentWeek+1] })
-      .in('item_id', items);
-    if(error) console.error('clearWeek alimentos:', error);
+    await deleteRecordsOffline(`del:alimentos:${WEEK_LABELS[foodCurrentWeek+1]}`,
+      { user_id: currentUser.id, app_type: 'alimentos', week_label: WEEK_LABELS[foodCurrentWeek+1] }, 'item_id', items);
     refreshFoodDisplays();
   }
   showToast('Semana zerada ✓');
@@ -2585,29 +2787,47 @@ function showToast(msg) {
 // ═══════════════════════════════════════════════════════════════════════════════
 async function fetchCatalogConfig() {
   if (!currentUser) return;
-  const { data, error } = await _supabase
-    .from('catalog_config')
-    .select('app_type, data')
-    .eq('user_id', currentUser.id);
-  if (error) { console.error('fetchCatalogConfig:', error); return; }
+  // Offline: o snapshot local (carregado por fetchAllData) já trouxe o
+  // catálogo salvo por último; não há nada para buscar na rede agora.
+  if (!navigator.onLine) return;
+
+  const { data, error } = await withTimeout(
+    _supabase.from('catalog_config').select('app_type, data').eq('user_id', currentUser.id)
+  );
+  if (error) { console.error('fetchCatalogConfig:', error); handleConnectivityDrop(); return; }
   (data || []).forEach(row => {
     if (!Array.isArray(row.data)) return;
     if (row.app_type === 'bebidas') { CAT_BEBIDAS.length = 0; CAT_BEBIDAS.push(...row.data); }
     else if (row.app_type === 'cervejas') { CAT_CERVEJAS.length = 0; CAT_CERVEJAS.push(...row.data); }
     else if (row.app_type === 'alimentos') { CAT_ALIMENTOS.length = 0; CAT_ALIMENTOS.push(...row.data); }
   });
+  saveLocalSnapshot();
 }
 
+// Funciona offline: aplica local e guarda na fila de sincronização (chave
+// "cat:<tipo>", então editar várias vezes offline não duplica o envio).
 async function saveCatalogConfig(type) {
   if (!currentUser) return;
   const data = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
-  const { error } = await _supabase
-    .from('catalog_config')
-    .upsert(
-      { user_id: currentUser.id, app_type: type, data, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,app_type' }
-    );
-  if (error) { console.error('saveCatalogConfig:', error); showToast('⚠️ Erro ao salvar no banco!'); }
+  const key = `cat:${type}`;
+  const payload = { user_id: currentUser.id, app_type: type, data, updated_at: new Date().toISOString() };
+  saveLocalSnapshot();
+
+  if (!navigator.onLine) {
+    queueOperation(key, { table: 'catalog_config', op: 'upsert', payload, conflict: 'user_id,app_type' });
+    return;
+  }
+
+  const { error } = await withTimeout(
+    _supabase.from('catalog_config').upsert(payload, { onConflict: 'user_id,app_type' })
+  );
+  if (error) {
+    console.error('saveCatalogConfig:', error);
+    queueOperation(key, { table: 'catalog_config', op: 'upsert', payload, conflict: 'user_id,app_type' });
+    handleConnectivityDrop();
+  } else {
+    removeFromQueue(key);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2762,8 +2982,8 @@ async function removeCfgItem(type, catIdx, itIdx) {
 // REALTIME — escuta mudanças feitas por outros dispositivos/usuários e atualiza a UI
 // ═══════════════════════════════════════════════════════════════════════════════
 function setupRealtime() {
-  if (!currentUser) return;
-  _supabase
+  if (!currentUser || !navigator.onLine || _realtimeChannel) return;
+  _realtimeChannel = _supabase
     .channel('inventory_records_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_records' }, async (payload) => {
       const row = payload.new || payload.old;
@@ -2807,6 +3027,7 @@ function refreshCurrentView() {
     await fetchCatalogConfig();
     showSelector();
     setupRealtime();
+    updateOfflineBanner();
   } else {
     showLogin();
   }
