@@ -1377,40 +1377,116 @@ function exportPDFBebidas() {
   showToast('Gerando PDF…');
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, margin=14, colW=pageW-margin*2;
   const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
   const stock = getResumoBebidas();
   const now = new Date().toLocaleString('pt-BR');
-  doc.setFillColor(15,14,13); doc.rect(0,0,210,30,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(232,160,32);
-  doc.text('BLACK SKULL BIER — BEBIDAS', 14, 13);
-  doc.setFontSize(9); doc.setTextColor(180,175,168);
-  doc.text(`Semana: ${semLabel}   |   Gerado: ${now}`, 14, 21);
-  let y = 36;
-  CAT_BEBIDAS.forEach(cat => {
-    const items = cat.itens.map(it => {
-      const qty = stock[it.id]||0, min = bGetMin(it.id), st = itemStatus(qty,min);
-      return [String(it.id), it.nome, String(qty), min>0?String(min):'—', st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—'];
-    });
-    doc.autoTable({
-      startY: y,
-      head: [[{content: cat.nome, colSpan:5, styles:{fillColor:[34,33,32],textColor:[232,160,32],fontStyle:'bold',fontSize:9}}],
-             ['Cód.','Item','Qtd','Mín','Status']],
-      body: items,
-      theme: 'grid',
-      styles: {fontSize:8, cellPadding:2, textColor:[240,237,232], lineColor:[46,44,42], fillColor:[26,25,23]},
-      headStyles: {fillColor:[42,41,38], textColor:[138,135,128], fontSize:7.5, fontStyle:'bold'},
-      columnStyles: {0:{cellWidth:14,textColor:[100,97,92]},2:{cellWidth:14,halign:'center'},3:{cellWidth:14,halign:'center'},4:{cellWidth:22,halign:'center'}},
-      didParseCell: (d) => {
-        if(d.section==='body'&&d.column.index===4){
-          if(d.cell.raw==='Faltando'){d.cell.styles.textColor=[224,85,85];d.cell.styles.fontStyle='bold';}
-          else if(d.cell.raw==='Baixo'){d.cell.styles.textColor=[240,192,64];}
-          else if(d.cell.raw==='OK'){d.cell.styles.textColor=[76,175,111];}
-        }
-      },
-      margin: {left:14, right:14},
-    });
-    y = doc.lastAutoTable.finalY + 4;
+
+  // Calcular cards
+  const missing=[],low=[],okList=[];
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
+    else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
+    else if(st==='ok') okList.push({...it,qty,min,cat:cat.nome});
+  }));
+  const totalQty = CAT_BEBIDAS.flatMap(c=>c.itens).reduce((s,it)=>s+(stock[it.id]||0),0);
+
+  // Cabeçalho preto
+  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO DE ESTOQUE — BEBIDAS', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  // Cards de resumo
+  let y=34;
+  const cardW=(colW-8)/3;
+  [{label:'FALTANDO',num:missing.length,r:220,g:60,b:60},{label:'BAIXO',num:low.length,r:220,g:170,b:40},{label:'OK',num:okList.length,r:60,g:175,b:100}]
+  .forEach((c,i)=>{
+    const cx=margin+i*(cardW+4);
+    doc.setFillColor(245,245,245); doc.setDrawColor(220,220,220);
+    doc.roundedRect(cx,y,cardW,18,2,2,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(c.r,c.g,c.b);
+    doc.text(String(c.num),cx+cardW/2,y+11,{align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text(c.label,cx+cardW/2,y+16.5,{align:'center'});
   });
+  y+=26;
+
+  function sectionTitle(title,r,g,b){
+    doc.setFillColor(r,g,b); doc.rect(margin,y,colW,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+    doc.text(title,margin+3,y+4.8); y+=9;
+  }
+
+  // Faltando
+  if(missing.length){
+    sectionTitle('FALTANDO / ABAIXO DO MÍNIMO',210,60,60);
+    doc.autoTable({ startY:y,
+      head:[['Cód.','Bebida','Categoria','Qtd','Mínimo','Falta']],
+      body:missing.map(it=>[String(it.id),it.nome,it.cat,String(it.qty),String(it.min),String(it.min-it.qty)]),
+      theme:'grid', styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{0:{cellWidth:14,textColor:[120,120,120]},3:{halign:'center'},4:{halign:'center'},5:{halign:'center',textColor:[210,60,60],fontStyle:'bold'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+5;
+  }
+
+  // Baixo
+  if(low.length){
+    sectionTitle('ESTOQUE BAIXO',190,140,30);
+    doc.autoTable({ startY:y,
+      head:[['Cód.','Bebida','Categoria','Qtd','Mínimo']],
+      body:low.map(it=>[String(it.id),it.nome,it.cat,String(it.qty),String(it.min)]),
+      theme:'grid', styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{0:{cellWidth:14,textColor:[120,120,120]},3:{halign:'center',textColor:[190,140,30],fontStyle:'bold'},4:{halign:'center'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+5;
+  }
+
+  // Contagem completa por categoria
+  sectionTitle('CONTAGEM COMPLETA',50,50,50);
+  const body=[];
+  CAT_BEBIDAS.forEach(cat=>{
+    body.push([{content:cat.nome,colSpan:5,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.itens.forEach(it=>{
+      const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
+      const stL=st==='missing'?'FALTA':st==='low'?'BAIXO':st==='ok'?'OK':'—';
+      body.push([String(it.id),it.nome,'',String(qty),stL]);
+    });
+  });
+  doc.autoTable({ startY:y,
+    head:[['Cód.','Item','','Quantidade','Status']],
+    body,theme:'grid',
+    styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+    headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+    columnStyles:{0:{cellWidth:14,textColor:[120,120,120]},2:{cellWidth:0},3:{halign:'center'},4:{halign:'center'}},
+    didParseCell:(d)=>{
+      if(d.section==='body'&&d.column.index===4){
+        if(d.cell.raw==='FALTA'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='BAIXO'){d.cell.styles.textColor=[190,140,30];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='OK'){d.cell.styles.textColor=[60,160,90];}
+      }
+    },
+    margin:{left:margin,right:margin}});
+  y=doc.lastAutoTable.finalY+5;
+
+  // Total
+  doc.setFillColor(240,240,240); doc.setDrawColor(200,200,200);
+  doc.rect(margin,y,colW,9,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+  doc.text('TOTAL',margin+3,y+6);
+  doc.text(String(totalQty),pageW-margin-3,y+6,{align:'right'});
+
+  // Rodapé
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Controle de Estoque',margin,290);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
+  }
   doc.save(`bebidas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}.pdf`);
   showToast('PDF exportado ✓');
 }
@@ -1612,39 +1688,125 @@ function exportPDFCervejas() {
   showToast('Gerando PDF…');
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const pageW=297, margin=14, colW=pageW-margin*2;
   const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
   const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
   const now = new Date().toLocaleString('pt-BR');
-  doc.setFillColor(15,14,13); doc.rect(0,0,297,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(232,160,32);
-  doc.text('BLACK SKULL BIER — CERVEJAS', 14, 12);
-  doc.setFontSize(9); doc.setTextColor(180,175,168);
-  doc.text(`Semana: ${semLabel}   |   Gerado: ${now}`, 14, 21);
-  const rows = [];
+
+  // Calcular stocks
+  const missing=[],low=[],okList=[];
+  let totalQty=0;
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
-    const total = weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
-    const d = {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
-    weeks.forEach(w=>{ const dd=cGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
+    const total=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+    totalQty+=total;
     const min=cGetMin(it.id),st=itemStatus(total,min);
-    rows.push([it.nome, cat.nome, String(total), String(d.estoque), String(d.piscina), String(d.gel_ext), String(d.bar), String(d.camara), min>0?String(min):'—', st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—']);
+    const d={estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+    weeks.forEach(w=>{const dd=cGetItemData(it.id,w);LOCAIS.forEach(l=>{d[l.id]=(d[l.id]||0)+(dd[l.id]||0);});});
+    const entry={nome:it.nome,cat:cat.nome,total,min,d};
+    if(st==='missing') missing.push({...entry,falta:min-total});
+    else if(st==='low') low.push(entry);
+    else if(st==='ok') okList.push(entry);
   }));
-  doc.autoTable({
-    startY: 34,
-    head: [['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Status']],
-    body: rows,
-    theme: 'grid',
-    styles: {fontSize:8, cellPadding:2, textColor:[240,237,232], lineColor:[46,44,42], fillColor:[26,25,23]},
-    headStyles: {fillColor:[42,41,38], textColor:[232,160,32], fontSize:8, fontStyle:'bold'},
-    columnStyles: {2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'},9:{halign:'center'}},
-    didParseCell: (d) => {
-      if(d.section==='body'&&d.column.index===9){
-        if(d.cell.raw==='Faltando'){d.cell.styles.textColor=[224,85,85];d.cell.styles.fontStyle='bold';}
-        else if(d.cell.raw==='Baixo'){d.cell.styles.textColor=[240,192,64];}
-        else if(d.cell.raw==='OK'){d.cell.styles.textColor=[76,175,111];}
+
+  // Cabeçalho preto
+  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO DE ESTOQUE — CERVEJAS', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  // Cards
+  let y=34;
+  const cardW=(colW-8)/3;
+  [{label:'FALTANDO',num:missing.length,r:220,g:60,b:60},{label:'BAIXO',num:low.length,r:220,g:170,b:40},{label:'OK',num:okList.length,r:60,g:175,b:100}]
+  .forEach((c,i)=>{
+    const cx=margin+i*(cardW+4);
+    doc.setFillColor(245,245,245); doc.setDrawColor(220,220,220);
+    doc.roundedRect(cx,y,cardW,18,2,2,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(c.r,c.g,c.b);
+    doc.text(String(c.num),cx+cardW/2,y+11,{align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text(c.label,cx+cardW/2,y+16.5,{align:'center'});
+  });
+  y+=26;
+
+  function sectionTitle(title,r,g,b){
+    doc.setFillColor(r,g,b); doc.rect(margin,y,colW,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+    doc.text(title,margin+3,y+4.8); y+=9;
+  }
+  const locCols={3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'}};
+
+  // Faltando
+  if(missing.length){
+    sectionTitle('FALTANDO / ABAIXO DO MÍNIMO',210,60,60);
+    doc.autoTable({startY:y,
+      head:[['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Falta']],
+      body:missing.map(({nome,cat,total,min,d,falta})=>[nome,cat,String(total),String(d.estoque),String(d.piscina),String(d.gel_ext),String(d.bar),String(d.camara),String(min),String(falta)]),
+      theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'},9:{halign:'center',textColor:[210,60,60],fontStyle:'bold'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+5;
+  }
+
+  // Baixo
+  if(low.length){
+    sectionTitle('ESTOQUE BAIXO',190,140,30);
+    doc.autoTable({startY:y,
+      head:[['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo']],
+      body:low.map(({nome,cat,total,min,d})=>[nome,cat,String(total),String(d.estoque),String(d.piscina),String(d.gel_ext),String(d.bar),String(d.camara),String(min)]),
+      theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{2:{halign:'center',textColor:[190,140,30],fontStyle:'bold'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+5;
+  }
+
+  // Contagem completa
+  sectionTitle('CONTAGEM COMPLETA',50,50,50);
+  const body=[];
+  CAT_CERVEJAS.forEach(cat=>{
+    body.push([{content:cat.nome,colSpan:9,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.itens.forEach(it=>{
+      const total=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+      const d={estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+      weeks.forEach(w=>{const dd=cGetItemData(it.id,w);LOCAIS.forEach(l=>{d[l.id]=(d[l.id]||0)+(dd[l.id]||0);});});
+      const min=cGetMin(it.id),st=itemStatus(total,min);
+      const stL=st==='missing'?'FALTA':st==='low'?'BAIXO':st==='ok'?'OK':'—';
+      body.push([it.nome,'',String(total),String(d.estoque),String(d.piscina),String(d.gel_ext),String(d.bar),String(d.camara),stL]);
+    });
+  });
+  doc.autoTable({startY:y,
+    head:[['Cerveja','','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Status']],
+    body,theme:'grid',
+    styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+    headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+    columnStyles:{1:{cellWidth:0},2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'}},
+    didParseCell:(d)=>{
+      if(d.section==='body'&&d.column.index===8){
+        if(d.cell.raw==='FALTA'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='BAIXO'){d.cell.styles.textColor=[190,140,30];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='OK'){d.cell.styles.textColor=[60,160,90];}
       }
     },
-    margin:{left:14,right:14},
-  });
+    margin:{left:margin,right:margin}});
+  y=doc.lastAutoTable.finalY+5;
+
+  // Total
+  doc.setFillColor(240,240,240); doc.setDrawColor(200,200,200);
+  doc.rect(margin,y,colW,9,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+  doc.text('TOTAL',margin+3,y+6);
+  doc.text(String(totalQty),pageW-margin-3,y+6,{align:'right'});
+
+  // Rodapé
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Controle de Estoque',margin,200);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,200,{align:'right'});
+  }
   doc.save(`cervejas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}.pdf`);
   showToast('PDF exportado ✓');
 }
@@ -2058,7 +2220,10 @@ function renderAnalytics() {
   document.getElementById('appContent').innerHTML = `
     <div class="main no-weekbar">
       <div class="analytics-wrap">
-        <div class="analytics-title">📊 Analytics Geral</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="analytics-title">📊 Analytics Geral</div>
+          <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportPDFAnalytics()">📄 PDF</button>
+        </div>
         <div class="analytics-sub">Resumo consolidado de todos os estoques</div>
         <div class="an-week-bar" id="anWeekBar"></div>
         <div id="analyticsBody"></div>
@@ -2162,6 +2327,126 @@ function buildAnalyticsBody() {
     html+=`<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Nenhuma contagem registrada ainda.<br>Faça a contagem nos apps para ver o resumo.</div></div>`;
   }
   const body=document.getElementById('analyticsBody');if(body) body.innerHTML=html;
+}
+
+function exportPDFAnalytics() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, margin=14, colW=pageW-margin*2;
+  const semLabel = anWeek==='all'?'Todas as Semanas':`${anWeek}ª Semana`;
+  const weeks_n = anWeek==='all'?[1,2,3,4,5]:[anWeek];
+  const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
+  const now = new Date().toLocaleString('pt-BR');
+
+  // Calcular todos os dados
+  const bStock={};
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{bStock[it.id]=0;weeks_n.forEach(w=>{bStock[it.id]+=(DB.bebidas.stock[w]&&DB.bebidas.stock[w][it.id])||0;});}));
+  const cStock={};
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{cStock[it.id]=0;weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});}));
+  const aStock={};
+  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{aStock[item]=0;weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});}));
+
+  const allMissing=[],allLow=[],allOk=[];
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Bebidas'});
+    else if(st==='low') allLow.push({nome:it.nome,qty,min,src:'Bebidas'});
+    else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Bebidas'});
+  }));
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Cervejas'});
+    else if(st==='low') allLow.push({nome:it.nome,qty,min,src:'Cervejas'});
+    else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Cervejas'});
+  }));
+  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+    const qty=aStock[item],min=aGetMin(item),st=itemStatus(qty,min);
+    if(st==='missing') allMissing.push({nome:item,qty,min,falta:min-qty,src:'Alimentos'});
+    else if(st==='low') allLow.push({nome:item,qty,min,src:'Alimentos'});
+    else if(st==='ok') allOk.push({nome:item,qty,min,src:'Alimentos'});
+  }));
+
+  // Cabeçalho preto
+  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO ANALYTICS — GERAL', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  // Cards
+  let y=34;
+  const cardW=(colW-8)/3;
+  [{label:'FALTANDO',num:allMissing.length,r:220,g:60,b:60},{label:'BAIXO',num:allLow.length,r:220,g:170,b:40},{label:'OK',num:allOk.length,r:60,g:175,b:100}]
+  .forEach((c,i)=>{
+    const cx=margin+i*(cardW+4);
+    doc.setFillColor(245,245,245); doc.setDrawColor(220,220,220);
+    doc.roundedRect(cx,y,cardW,18,2,2,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(c.r,c.g,c.b);
+    doc.text(String(c.num),cx+cardW/2,y+11,{align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text(c.label,cx+cardW/2,y+16.5,{align:'center'});
+  });
+  y+=26;
+
+  function sectionTitle(title,r,g,b){
+    doc.setFillColor(r,g,b); doc.rect(margin,y,colW,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+    doc.text(title,margin+3,y+4.8); y+=9;
+  }
+
+  if(allMissing.length){
+    sectionTitle('FALTANDO / ABAIXO DO MÍNIMO',210,60,60);
+    doc.autoTable({startY:y,
+      head:[['Item','Origem','Qtd','Mínimo','Falta']],
+      body:allMissing.map(({nome,src,qty,min,falta})=>[nome,src,String(qty),String(min),String(falta)]),
+      theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{2:{halign:'center'},3:{halign:'center'},4:{halign:'center',textColor:[210,60,60],fontStyle:'bold'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+5;
+  }
+
+  if(allLow.length){
+    sectionTitle('ESTOQUE BAIXO',190,140,30);
+    doc.autoTable({startY:y,
+      head:[['Item','Origem','Qtd','Mínimo']],
+      body:allLow.map(({nome,src,qty,min})=>[nome,src,String(qty),String(min)]),
+      theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{2:{halign:'center',textColor:[190,140,30],fontStyle:'bold'},3:{halign:'center'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+5;
+  }
+
+  if(allOk.length){
+    sectionTitle('OK — ESTOQUE SUFICIENTE',50,50,50);
+    // Agrupado por origem
+    const srcs=['Bebidas','Cervejas','Alimentos'];
+    const body=[];
+    srcs.forEach(src=>{
+      const grp=allOk.filter(i=>i.src===src); if(!grp.length) return;
+      body.push([{content:src,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+      grp.forEach(({nome,qty,min})=>body.push([nome,String(qty),min>0?String(min):'—']));
+    });
+    doc.autoTable({startY:y,
+      head:[['Item','Qtd','Mínimo']],body,theme:'grid',
+      styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{1:{halign:'center',textColor:[60,160,90],fontStyle:'bold'},2:{halign:'center'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+5;
+  }
+
+  // Rodapé
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Analytics Geral',margin,290);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
+  }
+  doc.save(`analytics-${anWeek==='all'?'todas':anWeek+'sem'}.pdf`);
+  showToast('PDF exportado ✓');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
