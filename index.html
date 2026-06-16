@@ -729,6 +729,7 @@ async function checkUser() {
     currentUser = session.user;
     await ensureAppUserProfile();
     await fetchAllData();
+    await fetchCatalogConfig();
     showSelector();
     setupRealtime();
   } else {
@@ -2576,6 +2577,40 @@ function showToast(msg) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CATÁLOGO (categorias/itens editáveis na aba "Configurações")
+//   -> CAT_BEBIDAS / CAT_CERVEJAS / CAT_ALIMENTOS começam com os valores padrão
+//      definidos no código, mas são sobrescritos pelo que estiver salvo em
+//      public.catalog_config (se o usuário já editou o catálogo antes).
+//   -> Precisa da tabela public.catalog_config no Supabase (ver SQL fornecido).
+// ═══════════════════════════════════════════════════════════════════════════════
+async function fetchCatalogConfig() {
+  if (!currentUser) return;
+  const { data, error } = await _supabase
+    .from('catalog_config')
+    .select('app_type, data')
+    .eq('user_id', currentUser.id);
+  if (error) { console.error('fetchCatalogConfig:', error); return; }
+  (data || []).forEach(row => {
+    if (!Array.isArray(row.data)) return;
+    if (row.app_type === 'bebidas') { CAT_BEBIDAS.length = 0; CAT_BEBIDAS.push(...row.data); }
+    else if (row.app_type === 'cervejas') { CAT_CERVEJAS.length = 0; CAT_CERVEJAS.push(...row.data); }
+    else if (row.app_type === 'alimentos') { CAT_ALIMENTOS.length = 0; CAT_ALIMENTOS.push(...row.data); }
+  });
+}
+
+async function saveCatalogConfig(type) {
+  if (!currentUser) return;
+  const data = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const { error } = await _supabase
+    .from('catalog_config')
+    .upsert(
+      { user_id: currentUser.id, app_type: type, data, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,app_type' }
+    );
+  if (error) { console.error('saveCatalogConfig:', error); showToast('⚠️ Erro ao salvar no banco!'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // APP: CONFIGURAÇÕES DE ITENS
 // ═══════════════════════════════════════════════════════════════════════════════
 let configActiveTab = 'bebidas';
@@ -2661,7 +2696,7 @@ function buildConfigPage(type) {
   });
 }
 
-function addCfgCategory(type) {
+async function addCfgCategory(type) {
   const inp = document.getElementById(`cfg-new-cat-${type}`);
   const name = (inp?.value || '').trim();
   if (!name) { showToast('Digite o nome da categoria'); return; }
@@ -2671,9 +2706,10 @@ function addCfgCategory(type) {
   inp.value = '';
   buildConfigPage(type);
   showToast(`Categoria "${name}" adicionada ✓`);
+  await saveCatalogConfig(type);
 }
 
-function removeCfgCategory(type, catIdx) {
+async function removeCfgCategory(type, catIdx) {
   const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
   const nameKey = type === 'alimentos' ? 'name' : 'nome';
   const cat = cats[catIdx];
@@ -2685,9 +2721,10 @@ function removeCfgCategory(type, catIdx) {
   cats.splice(catIdx, 1);
   buildConfigPage(type);
   showToast(`Categoria removida ✓`);
+  await saveCatalogConfig(type);
 }
 
-function addCfgItem(type, catIdx) {
+async function addCfgItem(type, catIdx) {
   const nameInp = document.getElementById(`cfg-add-name-${type}-${catIdx}`);
   const name = (nameInp?.value || '').trim();
   if (!name) { showToast('Digite o nome do item'); return; }
@@ -2709,14 +2746,16 @@ function addCfgItem(type, catIdx) {
   nameInp.value = '';
   buildConfigPage(type);
   showToast(`"${name}" adicionado ✓`);
+  await saveCatalogConfig(type);
 }
 
-function removeCfgItem(type, catIdx, itIdx) {
+async function removeCfgItem(type, catIdx, itIdx) {
   if (type === 'bebidas') CAT_BEBIDAS[catIdx].itens.splice(itIdx, 1);
   else if (type === 'cervejas') CAT_CERVEJAS[catIdx].itens.splice(itIdx, 1);
   else CAT_ALIMENTOS[catIdx].items.splice(itIdx, 1);
   buildConfigPage(type);
   showToast('Item removido ✓');
+  await saveCatalogConfig(type);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2765,6 +2804,7 @@ function refreshCurrentView() {
     currentUser = session.user;
     await ensureAppUserProfile();
     await fetchAllData();
+    await fetchCatalogConfig();
     showSelector();
     setupRealtime();
   } else {
