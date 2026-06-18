@@ -1048,7 +1048,7 @@ async function fetchAllData() {
         const parts = String(r.item_id).split('__');
         const id = parts[0];
         const loc = parts[1] || null;
-        if (!DB.bebidas.stock[w][id]) DB.bebidas.stock[w][id] = {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+        if (!DB.bebidas.stock[w][id]) DB.bebidas.stock[w][id] = _EMPTY_LOCS();
         if (loc) {
           // novo formato por local
           DB.bebidas.stock[w][id][loc] = r.qty || 0;
@@ -1068,7 +1068,7 @@ async function fetchAllData() {
         const parts = String(r.item_id).split('__');
         const id = parts[0];
         const loc = parts[1] || 'estoque';
-        if (!DB.cervejas.stock[w][id]) DB.cervejas.stock[w][id] = {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+        if (!DB.cervejas.stock[w][id]) DB.cervejas.stock[w][id] = _EMPTY_LOCS();
         DB.cervejas.stock[w][id][loc] = r.qty || 0;
       }
     } else if (r.app_type === 'alimentos') {
@@ -1120,7 +1120,7 @@ async function upsertRecord(rec) {
 
 // ─── BEBIDAS helpers ──────────────────────────────────────────────────────────
 function bGetItemData(id, week) {
-  return (DB.bebidas.stock[week] && DB.bebidas.stock[week][id]) || {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+  return (DB.bebidas.stock[week] && DB.bebidas.stock[week][id]) || _EMPTY_LOCS();
 }
 function bGetTotal(id, week) {
   const d = bGetItemData(id, week);
@@ -1167,10 +1167,11 @@ function findBebidaMeta(id) {
 const LOCAIS = [
   { id:'estoque', label:'Estoque' }, { id:'piscina', label:'Piscina' },
   { id:'gel_ext', label:'Gel. Ext.' }, { id:'bar', label:'Bar' },
-  { id:'camara', label:'Câmara Fria' }
+  { id:'camara', label:'Câmara Fria' }, { id:'comandas', label:'Comandas' }
 ];
+const _EMPTY_LOCS = () => ({estoque:0,piscina:0,gel_ext:0,bar:0,camara:0,comandas:0});
 function cGetItemData(id, week) {
-  return (DB.cervejas.stock[week] && DB.cervejas.stock[week][id]) || {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+  return (DB.cervejas.stock[week] && DB.cervejas.stock[week][id]) || _EMPTY_LOCS();
 }
 function cGetTotal(id, week) {
   const d = cGetItemData(id, week);
@@ -1591,7 +1592,7 @@ function exportCSVBebidas() {
   const rows=[['Código','Bebida','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Status']];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const total=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(total,min);
-    const d={estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+    const d=_EMPTY_LOCS();
     weeks.forEach(w=>{ const dd=bGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
     rows.push([it.id,it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'Sem mín']);
   }));
@@ -1900,7 +1901,7 @@ function exportCSVCervejas() {
   const rows = [['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Status']];
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
     const total = weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
-    const d = weeks.length===1 ? cGetItemData(it.id,weeks[0]) : {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+    const d = weeks.length===1 ? cGetItemData(it.id,weeks[0]) : _EMPTY_LOCS();
     if(weeks.length>1) weeks.forEach(w=>{ const dd=cGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
     const min=cGetMin(it.id),st=itemStatus(total,min);
     rows.push([it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—']);
@@ -1926,7 +1927,7 @@ function exportPDFCervejas() {
     const total=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
     totalQty+=total;
     const min=cGetMin(it.id),st=itemStatus(total,min);
-    const d={estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+    const d=_EMPTY_LOCS();
     weeks.forEach(w=>{const dd=cGetItemData(it.id,w);LOCAIS.forEach(l=>{d[l.id]=(d[l.id]||0)+(dd[l.id]||0);});});
     const entry={nome:it.nome,cat:cat.nome,total,min,d};
     if(st==='missing') missing.push({...entry,falta:min-total});
@@ -1996,7 +1997,7 @@ function exportPDFCervejas() {
     body.push([{content:cat.nome,colSpan:9,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.itens.forEach(it=>{
       const total=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
-      const d={estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+      const d=_EMPTY_LOCS();
       weeks.forEach(w=>{const dd=cGetItemData(it.id,w);LOCAIS.forEach(l=>{d[l.id]=(d[l.id]||0)+(dd[l.id]||0);});});
       const min=cGetMin(it.id),st=itemStatus(total,min);
       const stL=st==='missing'?'FALTA':st==='low'?'BAIXO':st==='ok'?'OK':'—';
