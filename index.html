@@ -1039,10 +1039,23 @@ async function fetchAllData() {
   rows.forEach(r => {
     if (r.app_type === 'bebidas') {
       if (r.week_label === MIN_LABEL) {
-        DB.bebidas.mins[r.item_id] = r.min_qty || 0;
+        // item_id pode ser apenas o id (formato antigo) ou "id__local" (novo)
+        const baseId = String(r.item_id).split('__')[0];
+        DB.bebidas.mins[baseId] = r.min_qty || 0;
       } else {
         const w = weekLabelToNum(r.week_label);
-        if (w && DB.bebidas.stock[w]) DB.bebidas.stock[w][r.item_id] = r.qty || 0;
+        if (!w || !DB.bebidas.stock[w]) return;
+        const parts = String(r.item_id).split('__');
+        const id = parts[0];
+        const loc = parts[1] || null;
+        if (!DB.bebidas.stock[w][id]) DB.bebidas.stock[w][id] = {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+        if (loc) {
+          // novo formato por local
+          DB.bebidas.stock[w][id][loc] = r.qty || 0;
+        } else {
+          // compatibilidade: registro antigo (total único) → vai pro estoque
+          DB.bebidas.stock[w][id].estoque = (DB.bebidas.stock[w][id].estoque || 0) + (r.qty || 0);
+        }
       }
     } else if (r.app_type === 'cervejas') {
       if (r.week_label === MIN_LABEL) {
@@ -1106,20 +1119,27 @@ async function upsertRecord(rec) {
 }
 
 // ─── BEBIDAS helpers ──────────────────────────────────────────────────────────
-function bGetQty(id, week) { return (DB.bebidas.stock[week] && DB.bebidas.stock[week][id]) || 0; }
-async function bSetQty(id, week, val) {
-  const v = Math.max(0, val);
+function bGetItemData(id, week) {
+  return (DB.bebidas.stock[week] && DB.bebidas.stock[week][id]) || {estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+}
+function bGetTotal(id, week) {
+  const d = bGetItemData(id, week);
+  return LOCAIS.reduce((s, l) => s + (d[l.id] || 0), 0);
+}
+async function bSetItemData(id, week, data) {
   if (!DB.bebidas.stock[week]) DB.bebidas.stock[week] = {};
-  DB.bebidas.stock[week][id] = v;
+  DB.bebidas.stock[week][id] = data;
   const meta = findBebidaMeta(id);
-  await upsertRecord({
-    app_type: 'bebidas',
-    week_label: WEEK_LABELS[week],
-    item_id: String(id),
-    item_name: meta.nome,
-    category_name: meta.cat,
-    qty: v
-  });
+  for (const loc of LOCAIS) {
+    await upsertRecord({
+      app_type: 'bebidas',
+      week_label: WEEK_LABELS[week],
+      item_id: `${id}__${loc.id}`,
+      item_name: meta.nome,
+      category_name: `${meta.cat} · ${loc.label}`,
+      qty: data[loc.id] || 0
+    });
+  }
 }
 function bGetMin(id) { return DB.bebidas.mins[id] || 0; }
 async function bSetMin(id, val) {
@@ -1350,7 +1370,7 @@ function renderBebidas() {
   document.getElementById('appContent').innerHTML = `
     <div class="main" id="tab-contar">
       <div class="search-wrap"><input class="search-input" id="searchInput" type="search" placeholder="🔍 Buscar bebida…" oninput="renderContarBebidas()"></div>
-      <div id="contarList"></div>
+      <div id="contarList" style="padding:0 10px;display:flex;flex-direction:column;gap:6px"></div>
       <div style="height:80px"></div>
     </div>
     <div class="main no-weekbar" id="tab-resumo" style="display:none">
@@ -1405,6 +1425,7 @@ function setWeek(w) {
 
 // ─ Contar Bebidas ─────────────────────────────────────────────────────────────
 let _popoverId=null, _popoverMode='plus', _editingId=null;
+const bebExpanded = {};
 
 function renderContarBebidas() {
   const q = (document.getElementById('searchInput')?.value||'').toLowerCase().trim();
@@ -1412,54 +1433,67 @@ function renderContarBebidas() {
   CAT_BEBIDAS.forEach(cat => {
     const items = cat.itens.filter(it => !q || it.nome.toLowerCase().includes(q) || String(it.id).includes(q));
     if (!items.length) return;
-    html += `<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div><div class="item-list">`;
+    html += `<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div>`;
     items.forEach(it => {
-      const qty = bGetQty(it.id, currentWeek);
+      const total = bGetTotal(it.id, currentWeek);
       const min = bGetMin(it.id);
-      const st = itemStatus(qty,min);
-      const cls = st==='missing'?'critical':st==='low'?'low':qty>0?'has-qty':'';
-      html+=`<div class="item-card ${cls}" id="card-${it.id}">
-        <div class="item-name-wrap" onclick="openPopover(event,${it.id},'plus','b')">
-          <div class="item-name">${it.nome}</div><div class="item-code">#${it.id}</div>
+      const st = itemStatus(total, min);
+      const cls = st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':'';
+      const isExp = bebExpanded[it.id] || false;
+      const locData = bGetItemData(it.id, currentWeek);
+      let locHtml = LOCAIS.map(loc => {
+        const lq = locData[loc.id] || 0;
+        return `<div class="loc-item"><span class="loc-label">${loc.label}</span>
+          <div class="loc-ctrl">
+            <button class="loc-btn minus" onclick="openPopover(event,'${it.id}','minus','b','${loc.id}')">−</button>
+            <span class="loc-qty ${lq===0?'zero':''}" id="blq-${it.id}-${loc.id}">${lq}</span>
+            <button class="loc-btn plus" onclick="openPopover(event,'${it.id}','plus','b','${loc.id}')">+</button>
+          </div></div>`;
+      }).join('');
+      html+=`<div class="item-card-beer ${cls}" id="card-${it.id}">
+        <div class="item-top">
+          <div class="item-name-wrap" onclick="openPopover(event,'${it.id}','plus','b','estoque')" style="flex:1;min-width:0;cursor:pointer">
+            <div class="item-name-beer">${it.nome}</div>
+            <div class="item-sub">#${it.id} · Toque para +1 no Estoque</div>
+          </div>
+          ${min>0?`<span class="min-badge">mín ${min}</span>`:''}
+          <div class="counter-ctrl">
+            <button class="btn-adj btn-minus" onclick="openPopover(event,'${it.id}','minus','b','total')">−</button>
+            <div class="qty-display-beer ${total===0?'zero':''}" id="qty-${it.id}">${total}</div>
+            <button class="btn-adj btn-plus" onclick="openPopover(event,'${it.id}','plus','b','total')">+</button>
+          </div>
         </div>
-        ${min>0?`<span class="min-badge">mín ${min}</span>`:''}
-        <div class="counter-ctrl">
-          <button class="btn-adj btn-minus" onclick="openPopover(event,${it.id},'minus','b')">−</button>
-          <div class="qty-display ${qty===0?'zero':''}" id="qty-${it.id}" onclick="editQtyBebida(${it.id})">${qty}</div>
-          <button class="btn-adj btn-plus" onclick="openPopover(event,${it.id},'plus','b')">+</button>
+        <button class="toggle-loc" onclick="toggleLocBeb('${it.id}')">
+          <span id="btog-icon-${it.id}">${isExp?'▲':'▼'}</span>
+          <span id="btog-txt-${it.id}">${isExp?'Ocultar locais':'Ver por local'}</span>
+        </button>
+        <div class="loc-details ${isExp?'':'hidden'}" id="blocs-${it.id}">
+          <div class="loc-grid" style="margin-top:6px">${locHtml}</div>
         </div>
       </div>`;
     });
-    html+='</div>';
   });
   if (!html) html=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Nenhum item encontrado</div></div>`;
   document.getElementById('contarList').innerHTML = html;
 }
 
-function editQtyBebida(id) {
-  if (_editingId!==null) return;
-  _editingId = id;
-  const el = document.getElementById(`qty-${id}`);
-  if (!el||el.tagName!=='DIV') return;
-  const cur = bGetQty(id,currentWeek);
-  const inp = document.createElement('input');
-  inp.type='number'; inp.min='0'; inp.value=cur; inp.className='qty-input-edit'; inp.id=`qedit-${id}`;
-  el.replaceWith(inp); inp.focus(); inp.select();
-  inp.addEventListener('blur',()=>commitQtyBebida(id));
+function toggleLocBeb(id) {
+  bebExpanded[id] = !bebExpanded[id];
+  const det=document.getElementById(`blocs-${id}`), icon=document.getElementById(`btog-icon-${id}`), txt=document.getElementById(`btog-txt-${id}`);
+  if(det) det.classList.toggle('hidden', !bebExpanded[id]);
+  if(icon) icon.textContent = bebExpanded[id]?'▲':'▼';
+  if(txt) txt.textContent = bebExpanded[id]?'Ocultar locais':'Ver por local';
 }
-async function commitQtyBebida(id) {
-  const inp = document.getElementById(`qedit-${id}`); if(!inp) return;
-  const v = Math.max(0,parseInt(inp.value)||0);
-  await bSetQty(id,currentWeek,v);
-  const div = document.createElement('div');
-  div.className=`qty-display${v===0?' zero':''}`;div.id=`qty-${id}`;div.textContent=v;div.onclick=()=>editQtyBebida(id);
-  inp.replaceWith(div); refreshCardBebida(id); _editingId=null;
-}
+
 function refreshCardBebida(id) {
-  const qty=bGetQty(id,currentWeek), min=bGetMin(id), st=itemStatus(qty,min);
+  const total=bGetTotal(id,currentWeek), min=bGetMin(id), st=itemStatus(total,min);
   const card=document.getElementById(`card-${id}`); if(!card) return;
-  card.className=`item-card ${st==='missing'?'critical':st==='low'?'low':qty>0?'has-qty':''}`;
-  const qd=document.getElementById(`qty-${id}`); if(qd){qd.textContent=qty;qd.className=`qty-display${qty===0?' zero':''}`;}
+  card.className=`item-card-beer ${st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':''}`;
+  const qd=document.getElementById(`qty-${id}`); if(qd){qd.textContent=total;qd.className=`qty-display-beer${total===0?' zero':''}`;}
+  LOCAIS.forEach(loc=>{
+    const lq=(bGetItemData(id,currentWeek)[loc.id]||0);
+    const lel=document.getElementById(`blq-${id}-${loc.id}`);if(lel){lel.textContent=lq;lel.className=`loc-qty${lq===0?' zero':''}`;}
+  });
 }
 
 // ─ Resumo Bebidas ─────────────────────────────────────────────────────────────
@@ -1518,7 +1552,7 @@ function getResumoBebidas() {
   const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     stock[it.id]=0;
-    weeks.forEach(w=>{ stock[it.id]+=(DB.bebidas.stock[w]&&DB.bebidas.stock[w][it.id])||0; });
+    weeks.forEach(w=>{ stock[it.id]+=bGetTotal(it.id,w); });
   }));
   return stock;
 }
@@ -1553,10 +1587,13 @@ async function adjMinBebida(id,delta) {
 function exportCSVBebidas() {
   const stock=getResumoBebidas();
   const semLabel=resumoWeek==='all'?'Todas':`${resumoWeek}aSemana`;
-  const rows=[['Código','Bebida','Categoria','Qtd','Mínimo','Status']];
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  const rows=[['Código','Bebida','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Status']];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
-    const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
-    rows.push([it.id,it.nome,cat.nome,qty,min,st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'Sem mín']);
+    const total=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(total,min);
+    const d={estoque:0,piscina:0,gel_ext:0,bar:0,camara:0};
+    weeks.forEach(w=>{ const dd=bGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
+    rows.push([it.id,it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'Sem mín']);
   }));
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download=`estoque-bebidas-${semLabel}.csv`;a.click();
@@ -2465,7 +2502,7 @@ function buildAnalyticsBody() {
 
   const bStock={};
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
-    bStock[it.id]=0; weeks_n.forEach(w=>{bStock[it.id]+=(DB.bebidas.stock[w]&&DB.bebidas.stock[w][it.id])||0;});
+    bStock[it.id]=0; weeks_n.forEach(w=>{bStock[it.id]+=bGetTotal(it.id,w);});
   }));
   const cStock={};
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
@@ -2555,7 +2592,7 @@ function exportPDFAnalytics() {
 
   // Calcular todos os dados
   const bStock={};
-  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{bStock[it.id]=0;weeks_n.forEach(w=>{bStock[it.id]+=(DB.bebidas.stock[w]&&DB.bebidas.stock[w][it.id])||0;});}));
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{bStock[it.id]=0;weeks_n.forEach(w=>{bStock[it.id]+=bGetTotal(it.id,w);});}));
   const cStock={};
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{cStock[it.id]=0;weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});}));
   const aStock={};
@@ -2676,7 +2713,7 @@ function openPopover(evt, id, mode, app, locTarget) {
   const confirm=document.getElementById('adjPopoverConfirm');
   const inp=document.getElementById('adjPopoverInput');
   let locLabel='Total';
-  if(app==='c'&&locTarget!=='total') locLabel=LOCAIS.find(l=>l.id===locTarget)?.label||locTarget;
+  if((app==='c'||app==='b')&&locTarget!=='total') locLabel=LOCAIS.find(l=>l.id===locTarget)?.label||locTarget;
   if(mode==='plus'){title.textContent=`Adicionar — ${locLabel}`;title.className='adj-popover-title plus';confirm.className='adj-popover-confirm plus';}
   else {title.textContent=`Subtrair — ${locLabel}`;title.className='adj-popover-title minus';confirm.className='adj-popover-confirm minus';}
   inp.value=1; pop.classList.add('show'); pop.style.transform='';
@@ -2720,8 +2757,15 @@ async function confirmAdj() {
   closePopover();
   try {
     if(app==='b'){
-      const cur=bGetQty(id,currentWeek);
-      await bSetQty(id,currentWeek,Math.max(0,cur+delta));
+      if(locTarget==='total'){
+        const d=bGetItemData(id,currentWeek);
+        d.estoque=Math.max(0,(d.estoque||0)+delta);
+        await bSetItemData(id,currentWeek,d);
+      } else {
+        const d=bGetItemData(id,currentWeek);
+        d[locTarget]=Math.max(0,(d[locTarget]||0)+delta);
+        await bSetItemData(id,currentWeek,d);
+      }
       refreshCardBebida(id);
     } else if(app==='c') {
       if(locTarget==='total'){
@@ -2798,9 +2842,10 @@ async function clearWeek() {
   if(currentApp==='bebidas'){
     const week = currentWeek;
     DB.bebidas.stock[week]={};
-    const ids = CAT_BEBIDAS.flatMap(cat=>cat.itens.map(it=>String(it.id)));
+    const itemIds=[];
+    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>LOCAIS.forEach(loc=>itemIds.push(`${it.id}__${loc.id}`))));
     await deleteRecordsOffline(`del:bebidas:${WEEK_LABELS[week]}`,
-      { user_id: currentUser.id, app_type: 'bebidas', week_label: WEEK_LABELS[week] }, 'item_id', ids);
+      { user_id: currentUser.id, app_type: 'bebidas', week_label: WEEK_LABELS[week] }, 'item_id', itemIds);
     renderContarBebidas();
   } else if(currentApp==='cervejas'){
     const week = currentWeek;
