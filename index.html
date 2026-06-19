@@ -553,9 +553,16 @@ header {
 .min-val.zero{color:var(--text-muted);}
 .min-val:focus{border-color:var(--amber);}
 
-.cfg-item-row { display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:5px; gap:8px; }
-.cfg-item-name { flex:1; font-size:13px; color:var(--text); }
-.cfg-item-code { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted); margin-top:2px; }
+.cfg-item-row { display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:5px; gap:8px; touch-action:none; }
+.cfg-item-row.dragging { opacity:0.4; border-color:var(--amber); }
+.cfg-item-row.drag-over { border-color:var(--amber); border-style:dashed; }
+.cfg-drag-handle { flex-shrink:0; width:22px; height:30px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:16px; cursor:grab; user-select:none; touch-action:none; }
+.cfg-drag-handle:active { cursor:grabbing; color:var(--amber); }
+.cfg-item-name { flex:1; font-size:13px; color:var(--text); padding:3px 0; border-radius:4px; }
+.cfg-item-name.editable:active { background:var(--surface3); }
+.cfg-item-code { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted); margin-top:2px; padding:2px 0; }
+.cfg-edit-input { width:100%; background:var(--surface3); border:1px solid var(--amber); border-radius:4px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; padding:3px 6px; outline:none; }
+.cfg-edit-input.code { font-family:'DM Mono',monospace; font-size:10px; max-width:90px; margin-top:2px; }
 .cfg-del-btn { background:var(--red-dim); border:none; color:var(--red); border-radius:5px; width:26px; height:26px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .cfg-del-btn:active { opacity:0.6; }
 .cfg-add-row { display:flex; gap:6px; margin-top:8px; margin-bottom:14px; flex-wrap:wrap; }
@@ -1511,12 +1518,13 @@ function renderResumoBebidas() {
     });
   }
   const stock = getResumoBebidas();
-  const missing=[],low=[],ok=[];
+  const missing=[],low=[],ok=[],zerados=[];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
     else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
     else if(st==='ok') ok.push({...it,qty,min,cat:cat.nome});
+    else if(qty===0) zerados.push({...it,qty,min,cat:cat.nome});
   }));
   const scM=document.getElementById('sc-missing');if(scM) scM.textContent=missing.length;
   const scL=document.getElementById('sc-low');if(scL) scL.textContent=low.length;
@@ -1532,6 +1540,11 @@ function renderResumoBebidas() {
   if(low.length){
     html+=`<div class="section-title yellow">⚠️ Estoque Baixo</div><div class="alert-cards">`;
     low.forEach(it=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">${it.cat} · mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+  if(zerados.length){
+    html+=`<div class="section-title" style="color:var(--text-muted)">⬜ Zerados</div><div class="alert-cards">`;
+    zerados.forEach(it=>{html+=`<div class="alert-card" style="border-left:3px solid var(--text-muted)"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">${it.cat}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
     html+='</div>';
   }
   if(ok.length){
@@ -1839,12 +1852,13 @@ function renderResumoCervejas() {
     stock[it.id]=0;
     weeks.forEach(w=>{stock[it.id]+=cGetTotal(it.id,w);});
   }));
-  const missing=[],low=[],ok=[];
+  const missing=[],low=[],ok=[],zerados=[];
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=stock[it.id]||0,min=cGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
     else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
     else if(st==='ok') ok.push({...it,qty,min,cat:cat.nome});
+    else if(qty===0) zerados.push({...it,qty,min,cat:cat.nome});
   }));
   const scM=document.getElementById('sc-missing');if(scM) scM.textContent=missing.length;
   const scL=document.getElementById('sc-low');if(scL) scL.textContent=low.length;
@@ -1858,6 +1872,11 @@ function renderResumoCervejas() {
   if(low.length){
     html+=`<div class="section-title yellow">⚠️ Baixo</div><div class="alert-cards">`;
     low.forEach(it=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
+    html+='</div>';
+  }
+  if(zerados.length){
+    html+=`<div class="section-title" style="color:var(--text-muted)">⬜ Zerados</div><div class="alert-cards">`;
+    zerados.forEach(it=>{html+=`<div class="alert-card" style="border-left:3px solid var(--text-muted)"><div class="alert-info"><div class="alert-name">${it.nome}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
     html+='</div>';
   }
   if(ok.length){
@@ -2260,6 +2279,16 @@ function buildFoodResumo() {
         </div>`;
       });
     });
+  }
+  const zerados=[];
+  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+    const qty=agg[item]||0,min=aGetMin(item);
+    if(qty===0 && min===0) zerados.push(item);
+  }));
+  if(zerados.length){
+    html+=`<div class="section-title" style="color:var(--text-muted)">⬜ Zerados</div><div class="alert-cards">`;
+    zerados.forEach(item=>{html+=`<div class="alert-card" style="border-left:3px solid var(--text-muted)"><div class="alert-info"><div class="alert-name">${item}</div></div><div class="alert-qty">0</div></div>`;});
+    html+='</div>';
   }
   body.innerHTML=html;
 }
@@ -2987,13 +3016,17 @@ function buildConfigPage(type) {
       const row = document.createElement('div');
       row.className = 'cfg-item-row';
       row.id = `cfg-item-${type}-${catIdx}-${itIdx}`;
+      row.dataset.type = type; row.dataset.cat = catIdx; row.dataset.idx = itIdx;
+      const nameField = type === 'alimentos'
+        ? `<div class="cfg-item-name editable" onclick="editCfgName(this,'${type}',${catIdx},${itIdx})">${displayName}</div>`
+        : `<div class="cfg-item-name editable" onclick="editCfgName(this,'${type}',${catIdx},${itIdx})">${displayName}</div>
+           ${isObj && it.id!==undefined ? `<div class="cfg-item-code editable" onclick="editCfgCode(this,'${type}',${catIdx},${itIdx})">#${it.id}</div>` : ''}`;
       row.innerHTML = `
-        <div style="flex:1;min-width:0">
-          <div class="cfg-item-name">${displayName}</div>
-          ${isObj && it.id ? `<div class="cfg-item-code">#${it.id}</div>` : ''}
-        </div>
+        <div class="cfg-drag-handle">☰</div>
+        <div style="flex:1;min-width:0">${nameField}</div>
         <button class="cfg-del-btn" onclick="removeCfgItem('${type}',${catIdx},${itIdx})">✕</button>`;
       block.appendChild(row);
+      attachDragHandlers(row);
     });
 
     // Linha para adicionar item
@@ -3073,6 +3106,173 @@ async function removeCfgItem(type, catIdx, itIdx) {
   else CAT_ALIMENTOS[catIdx].items.splice(itIdx, 1);
   buildConfigPage(type);
   showToast('Item removido ✓');
+  await saveCatalogConfig(type);
+}
+
+// ─── Edição inline de nome/código ───────────────────────────────────────────
+function editCfgName(el, type, catIdx, itIdx) {
+  if (el.querySelector('input')) return;
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const itemsKey = type === 'alimentos' ? 'items' : 'itens';
+  const items = cats[catIdx][itemsKey];
+  const it = items[itIdx];
+  const isObj = typeof it === 'object';
+  const cur = isObj ? it.nome : it;
+  const inp = document.createElement('input');
+  inp.className = 'cfg-edit-input'; inp.value = cur;
+  el.textContent = ''; el.appendChild(inp);
+  inp.focus(); inp.select();
+  const commit = async () => {
+    const val = inp.value.trim();
+    if (val && val !== cur) {
+      if (isObj) it.nome = val; else items[itIdx] = val;
+      await saveCatalogConfig(type);
+      showToast('Nome atualizado ✓');
+    }
+    buildConfigPage(type);
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.removeEventListener('blur', commit); buildConfigPage(type); } });
+}
+
+function editCfgCode(el, type, catIdx, itIdx) {
+  if (el.querySelector('input')) return;
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const itemsKey = type === 'alimentos' ? 'items' : 'itens';
+  const items = cats[catIdx][itemsKey];
+  const it = items[itIdx];
+  if (typeof it !== 'object') return;
+  const cur = it.id;
+  const inp = document.createElement('input');
+  inp.className = 'cfg-edit-input code'; inp.value = cur;
+  if (type === 'bebidas') inp.type = 'number';
+  el.textContent = ''; el.appendChild(inp);
+  inp.focus(); inp.select();
+  const commit = async () => {
+    let val = inp.value.trim();
+    if (!val) { buildConfigPage(type); return; }
+    if (type === 'bebidas') {
+      val = parseInt(val);
+      if (!val) { showToast('Código inválido'); buildConfigPage(type); return; }
+      const dupe = CAT_BEBIDAS.some((c, ci) => c.itens.some((i, ii) => String(i.id) === String(val) && !(ci === catIdx && ii === itIdx)));
+      if (dupe) { showToast('Código já existe em outro item'); buildConfigPage(type); return; }
+    } else {
+      const dupe = CAT_CERVEJAS.some((c, ci) => c.itens.some((i, ii) => String(i.id) === String(val) && !(ci === catIdx && ii === itIdx)));
+      if (dupe) { showToast('Código já existe em outro item'); buildConfigPage(type); return; }
+    }
+    if (String(val) !== String(cur)) {
+      const oldId = it.id;
+      it.id = val;
+      await renameItemIdInData(type, oldId, val);
+      showToast('Código atualizado ✓');
+    }
+    buildConfigPage(type);
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.removeEventListener('blur', commit); buildConfigPage(type); } });
+}
+
+// Quando um código (id) de bebida/cerveja é alterado, migra os dados salvos (estoque, mínimos) para o novo id
+async function renameItemIdInData(type, oldId, newId) {
+  const oldKey = String(oldId), newKey = String(newId);
+  if (type === 'bebidas') {
+    for (const w of [1,2,3,4,5]) {
+      if (DB.bebidas.stock[w] && DB.bebidas.stock[w][oldKey] !== undefined) {
+        DB.bebidas.stock[w][newKey] = DB.bebidas.stock[w][oldKey];
+        delete DB.bebidas.stock[w][oldKey];
+        await bSetItemData(newKey, w, DB.bebidas.stock[w][newKey]);
+      }
+    }
+    if (DB.bebidas.mins[oldKey] !== undefined) {
+      DB.bebidas.mins[newKey] = DB.bebidas.mins[oldKey];
+      delete DB.bebidas.mins[oldKey];
+      await bSetMin(newKey, DB.bebidas.mins[newKey]);
+    }
+  } else if (type === 'cervejas') {
+    for (const w of [1,2,3,4,5]) {
+      if (DB.cervejas.stock[w] && DB.cervejas.stock[w][oldKey] !== undefined) {
+        DB.cervejas.stock[w][newKey] = DB.cervejas.stock[w][oldKey];
+        delete DB.cervejas.stock[w][oldKey];
+        await cSetItemData(newKey, w, DB.cervejas.stock[w][newKey]);
+      }
+    }
+    if (DB.cervejas.mins[oldKey] !== undefined) {
+      DB.cervejas.mins[newKey] = DB.cervejas.mins[oldKey];
+      delete DB.cervejas.mins[oldKey];
+      await cSetMin(newKey, DB.cervejas.mins[newKey]);
+    }
+  }
+}
+
+// ─── Drag-and-drop para reordenar itens ─────────────────────────────────────
+let _dragState = null;
+function attachDragHandlers(row) {
+  const handle = row.querySelector('.cfg-drag-handle');
+  if (!handle) return;
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    const list = row.parentElement;
+    const rows = Array.from(list.querySelectorAll('.cfg-item-row'));
+    _dragState = { row, list, rows, startY: e.clientY, origIdx: rows.indexOf(row), placeholder: null };
+    row.classList.add('dragging');
+    const ph = document.createElement('div');
+    ph.style.height = row.offsetHeight + 'px';
+    ph.style.margin = '0 0 5px 0';
+    ph.className = 'cfg-drag-placeholder';
+    row.parentElement.insertBefore(ph, row);
+    _dragState.placeholder = ph;
+    row.style.position = 'fixed';
+    row.style.zIndex = '999';
+    row.style.width = row.getBoundingClientRect().width + 'px';
+    row.style.left = row.getBoundingClientRect().left + 'px';
+    row.style.top = e.clientY - row.offsetHeight/2 + 'px';
+    document.body.appendChild(row);
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!_dragState || _dragState.row !== row) return;
+    row.style.top = e.clientY - row.offsetHeight/2 + 'px';
+    const ph = _dragState.placeholder;
+    const siblings = Array.from(_dragState.list.querySelectorAll('.cfg-item-row:not(.dragging), .cfg-drag-placeholder'));
+    let inserted = false;
+    for (const sib of siblings) {
+      if (sib === ph) continue;
+      const r = sib.getBoundingClientRect();
+      if (e.clientY < r.top + r.height/2) {
+        sib.parentElement.insertBefore(ph, sib);
+        inserted = true; break;
+      }
+    }
+    if (!inserted) _dragState.list.appendChild(ph);
+  });
+  const finish = async (e) => {
+    if (!_dragState || _dragState.row !== row) return;
+    const { list, placeholder } = _dragState;
+    row.style.position = ''; row.style.zIndex = ''; row.style.width = ''; row.style.left = ''; row.style.top = '';
+    row.classList.remove('dragging');
+    list.insertBefore(row, placeholder);
+    placeholder.remove();
+    const newRows = Array.from(list.querySelectorAll('.cfg-item-row'));
+    const newIdx = newRows.indexOf(row);
+    const { type, cat: catIdx } = row.dataset;
+    if (newIdx !== _dragState.origIdx) {
+      await reorderCfgItem(type, parseInt(catIdx), _dragState.origIdx, newIdx);
+    } else {
+      buildConfigPage(type);
+    }
+    _dragState = null;
+  };
+  handle.addEventListener('pointerup', finish);
+  handle.addEventListener('pointercancel', finish);
+}
+
+async function reorderCfgItem(type, catIdx, fromIdx, toIdx) {
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const itemsKey = type === 'alimentos' ? 'items' : 'itens';
+  const items = cats[catIdx][itemsKey];
+  const [moved] = items.splice(fromIdx, 1);
+  items.splice(toIdx, 0, moved);
+  buildConfigPage(type);
   await saveCatalogConfig(type);
 }
 
