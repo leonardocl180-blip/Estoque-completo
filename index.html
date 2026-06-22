@@ -1096,6 +1096,15 @@ function weekLabelToNum(label) {
   return m ? parseInt(m[1]) : null;
 }
 
+// Retorna a data de hoje formatada para uso em nomes de arquivo, ex: "22-06-2026"
+function pdfDateSuffix() {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
 // rec: {app_type, week_label, item_id, item_name, category_name, qty, min_qty}
 // Funciona offline: aplica local e guarda na fila de sincronização; quando a
 // internet voltar, flushPendingQueue() reenvia automaticamente.
@@ -1727,7 +1736,7 @@ function exportPDFBebidas() {
     doc.text('Black Skull Bier — Controle de Estoque',margin,290);
     doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
   }
-  doc.save(`bebidas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}.pdf`);
+  doc.save(`bebidas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}-${pdfDateSuffix()}.pdf`);
   showToast('PDF exportado ✓');
 }
 
@@ -2053,7 +2062,7 @@ function exportPDFCervejas() {
     doc.text('Black Skull Bier — Controle de Estoque',margin,200);
     doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,200,{align:'right'});
   }
-  doc.save(`cervejas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}.pdf`);
+  doc.save(`cervejas-${resumoWeek==='all'?'todas':resumoWeek+'sem'}-${pdfDateSuffix()}.pdf`);
   showToast('PDF exportado ✓');
 }
 
@@ -2062,7 +2071,8 @@ function exportPDFCervejas() {
 // ═══════════════════════════════════════════════════════════════════════════════
 function buildFoodHTML() {
   return `
-  <div id="food-week-bar" style="padding:10px 16px;display:flex;align-items:center;gap:8px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface);padding-top:100px"></div>
+  <div style="padding-top:100px">
+  <div id="food-week-bar" style="padding:10px 16px;display:flex;align-items:center;gap:8px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface)"></div>
   <div style="padding:10px 16px 4px;background:var(--surface);border-bottom:1px solid var(--border)">
     <input class="search-input" id="food-search" type="search" placeholder="🔍 Buscar item…" oninput="filterFoodItems(this.value)">
   </div>
@@ -2088,6 +2098,7 @@ function buildFoodHTML() {
       <div class="config-info">Define o mínimo de cada item. O resumo vai alertar itens <strong style="color:var(--red)">faltando</strong> e <strong style="color:var(--yellow)">baixos</strong>.</div>
       <div id="food-config-container"></div>
     </div>
+  </div>
   </div>`;
 }
 
@@ -2112,7 +2123,7 @@ function setFoodTab(tab) {
   });
   const wb=document.getElementById('food-week-bar');
   const fab=document.getElementById('fabClear');
-  if(wb) wb.style.display=tab==='config'?'none':'';
+  if(wb) wb.style.display=(tab==='config'||tab==='resumo')?'none':'';
   if(fab) fab.style.display=tab==='config'?'none':'flex';
   if(tab==='resumo') buildFoodResumo();
   if(tab==='config') buildFoodConfig();
@@ -2458,7 +2469,7 @@ function exportPDFAlimentos() {
     doc.text(`Pagina ${i} / ${pgCount}`, pageW-margin, 290, {align:'right'});
   }
 
-  const nomeArq = `alimentos-${foodResumoWeek===5?'todas':(foodResumoWeek+1)+'sem'}.pdf`;
+  const nomeArq = `alimentos-${foodResumoWeek===5?'todas':(foodResumoWeek+1)+'sem'}-${pdfDateSuffix()}.pdf`;
   doc.save(nomeArq);
   showToast('PDF exportado ✓');
 }
@@ -2726,7 +2737,7 @@ function exportPDFAnalytics() {
     doc.text('Black Skull Bier — Analytics Geral',margin,290);
     doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
   }
-  doc.save(`analytics-${anWeek==='all'?'todas':anWeek+'sem'}.pdf`);
+  doc.save(`analytics-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
   showToast('PDF exportado ✓');
 }
 
