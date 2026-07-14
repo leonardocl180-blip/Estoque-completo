@@ -553,7 +553,7 @@ header {
 .min-val.zero{color:var(--text-muted);}
 .min-val:focus{border-color:var(--amber);}
 
-.cfg-item-row { display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:5px; gap:8px; touch-action:none; }
+.cfg-item-row { display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 12px; margin-bottom:5px; gap:8px; }
 .cfg-item-row.dragging { opacity:0.4; border-color:var(--amber); }
 .cfg-item-row.drag-over { border-color:var(--amber); border-style:dashed; }
 .cfg-drag-handle { flex-shrink:0; width:22px; height:30px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:16px; cursor:grab; user-select:none; touch-action:none; }
@@ -564,6 +564,7 @@ header {
 .cfg-edit-input { width:100%; background:var(--surface3); border:1px solid var(--amber); border-radius:4px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; padding:3px 6px; outline:none; }
 .cfg-edit-input.code { font-family:'DM Mono',monospace; font-size:10px; max-width:90px; margin-top:2px; }
 .cfg-del-btn { background:var(--red-dim); border:none; color:var(--red); border-radius:5px; width:26px; height:26px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.cfg-edit-btn { background:var(--surface3); border:none; color:var(--amber); border-radius:5px; width:26px; height:26px; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .cfg-del-btn:active { opacity:0.6; }
 .cfg-add-row { display:flex; gap:6px; margin-top:8px; margin-bottom:14px; flex-wrap:wrap; }
 .cfg-add-input { flex:1; min-width:120px; padding:8px 12px; background:var(--surface); border:1px solid var(--border); border-radius:7px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; outline:none; transition:border-color .15s; }
@@ -2207,7 +2208,7 @@ function openFoodModal(item,row,display) {
 function closeFoodModal() { document.getElementById('foodModal').style.display='none'; _foodModalItem=null; }
 
 // Debounce de 10s por item (evita somas duplicadas em cliques repetidos/duplo toque)
-const _FOOD_DEBOUNCE_MS = 10000;
+const _FOOD_DEBOUNCE_MS = 3000;
 let _foodLastConfirmAt = {}; // chave: nome do item -> timestamp
 let _foodConfirmInFlight = false; // trava de reentrância enquanto o modal está processando
 
@@ -2769,7 +2770,7 @@ function openPopover(evt, id, mode, app, locTarget) {
 function closePopover() { document.getElementById('adjPopover').classList.remove('show'); _popoverId=null; }
 
 // Debounce de 10s por item (evita somas duplicadas em cliques repetidos/duplo toque)
-const _ADJ_DEBOUNCE_MS = 10000;
+const _ADJ_DEBOUNCE_MS = 3000;
 let _adjLastConfirmAt = {}; // chave: `${app}:${locTarget}:${id}` -> timestamp
 let _adjConfirmInFlight = false; // trava de reentrância enquanto o popover está processando
 
@@ -3028,13 +3029,16 @@ function buildConfigPage(type) {
       row.className = 'cfg-item-row';
       row.id = `cfg-item-${type}-${catIdx}-${itIdx}`;
       row.dataset.type = type; row.dataset.cat = catIdx; row.dataset.idx = itIdx;
+      const nameId = `cfg-item-name-${type}-${catIdx}-${itIdx}`;
+      const codeId = `cfg-item-code-${type}-${catIdx}-${itIdx}`;
       const nameField = type === 'alimentos'
-        ? `<div class="cfg-item-name editable" onclick="editCfgName(this,'${type}',${catIdx},${itIdx})">${displayName}</div>`
-        : `<div class="cfg-item-name editable" onclick="editCfgName(this,'${type}',${catIdx},${itIdx})">${displayName}</div>
-           ${isObj && it.id!==undefined ? `<div class="cfg-item-code editable" onclick="editCfgCode(this,'${type}',${catIdx},${itIdx})">#${it.id}</div>` : ''}`;
+        ? `<div class="cfg-item-name" id="${nameId}">${displayName}</div>`
+        : `<div class="cfg-item-name" id="${nameId}">${displayName}</div>
+           ${isObj && it.id!==undefined ? `<div class="cfg-item-code editable" id="${codeId}" onclick="editCfgCode(this,'${type}',${catIdx},${itIdx})">#${it.id}</div>` : ''}`;
       row.innerHTML = `
         <div class="cfg-drag-handle">☰</div>
         <div style="flex:1;min-width:0">${nameField}</div>
+        <button class="cfg-edit-btn" title="Editar" onclick="editCfgName(document.getElementById('${nameId}'),'${type}',${catIdx},${itIdx})">✎</button>
         <button class="cfg-del-btn" onclick="removeCfgItem('${type}',${catIdx},${itIdx})">✕</button>`;
       block.appendChild(row);
       attachDragHandlers(row);
