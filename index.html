@@ -2571,7 +2571,9 @@ function buildAnalyticsBody() {
   }));
   const aMissing=[],aLow=[],aOk=[];
   CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
-    const qty=aStock[item],min=aGetMin(item),st=itemStatus(qty,min);
+    const min=aGetMin(item);
+    if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
+    const qty=aStock[item],st=itemStatus(qty,min);
     if(st==='missing') aMissing.push({nome:item,qty,min,src:'🍔 Alimentos'});
     else if(st==='low') aLow.push({nome:item,qty,min,src:'🍔 Alimentos'});
     else if(st==='ok') aOk.push({nome:item,qty,min,src:'🍔 Alimentos'});
@@ -2654,7 +2656,9 @@ function exportPDFAnalytics() {
     else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Cervejas'});
   }));
   CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
-    const qty=aStock[item],min=aGetMin(item),st=itemStatus(qty,min);
+    const min=aGetMin(item);
+    if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
+    const qty=aStock[item],st=itemStatus(qty,min);
     if(st==='missing') allMissing.push({nome:item,qty,min,falta:min-qty,src:'Alimentos'});
     else if(st==='low') allLow.push({nome:item,qty,min,src:'Alimentos'});
     else if(st==='ok') allOk.push({nome:item,qty,min,src:'Alimentos'});
