@@ -1051,20 +1051,37 @@ async function fetchAllData() {
     return;
   }
 
-  const { data: rows, error } = await withTimeout(
-    _supabase
-      .from('inventory_records')
-      .select('app_type,week_label,item_id,item_name,category_name,qty,min_qty')
-      .eq('user_id', currentUser.id)
-  );
+  // Busca em páginas de 1000 (limite padrão de linhas por request do
+  // Supabase/PostgREST). Sem paginação, quando o total de registros do
+  // usuário passa de 1000 (bebidas+cervejas+alimentos somados), o SELECT
+  // volta truncado silenciosamente — sem erro nenhum — e os itens das
+  // semanas mais recentes (que ficam fora do corte) desaparecem da tela
+  // mesmo estando salvos corretamente no banco. Era isso que causava o
+  // bug relatado a partir da 3ª semana.
+  const PAGE_SIZE = 1000;
+  let rows = [];
+  let from = 0;
+  while (true) {
+    const { data: page, error } = await withTimeout(
+      _supabase
+        .from('inventory_records')
+        .select('app_type,week_label,item_id,item_name,category_name,qty,min_qty')
+        .eq('user_id', currentUser.id)
+        .range(from, from + PAGE_SIZE - 1)
+    );
 
-  if (error) {
-    console.error('fetchAllData inventory_records:', error);
-    loadLocalSnapshot();
-    handleConnectivityDrop();
-    return;
+    if (error) {
+      console.error('fetchAllData inventory_records:', error);
+      loadLocalSnapshot();
+      handleConnectivityDrop();
+      return;
+    }
+    if (!page) break;
+
+    rows = rows.concat(page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
-  if (!rows) return;
 
   // Monta o novo estado em uma variável local e só substitui o DB global no
   // final, de uma vez (troca atômica). Isso evita que uma renderização
