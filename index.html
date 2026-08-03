@@ -1021,7 +1021,6 @@ const MIN_LABEL = 'Minimos';
 
 async function fetchAllData() {
   if (!currentUser) return;
-  DB = emptyDB();
 
   if (!navigator.onLine) {
     loadLocalSnapshot();
@@ -1044,51 +1043,58 @@ async function fetchAllData() {
   }
   if (!rows) return;
 
+  // Monta o novo estado em uma variável local e só substitui o DB global no
+  // final, de uma vez (troca atômica). Isso evita que uma renderização
+  // concorrente veja o DB "zerado" enquanto o SELECT ainda está em andamento
+  // (o que fazia itens recém-digitados sumirem por alguns segundos).
+  const newDB = emptyDB();
+
   rows.forEach(r => {
     if (r.app_type === 'bebidas') {
       if (r.week_label === MIN_LABEL) {
         // item_id pode ser apenas o id (formato antigo) ou "id__local" (novo)
         const baseId = String(r.item_id).split('__')[0];
-        DB.bebidas.mins[baseId] = r.min_qty || 0;
+        newDB.bebidas.mins[baseId] = r.min_qty || 0;
       } else {
         const w = weekLabelToNum(r.week_label);
-        if (!w || !DB.bebidas.stock[w]) return;
+        if (!w || !newDB.bebidas.stock[w]) return;
         const parts = String(r.item_id).split('__');
         const id = parts[0];
         const loc = parts[1] || null;
-        if (!DB.bebidas.stock[w][id]) DB.bebidas.stock[w][id] = _EMPTY_LOCS();
+        if (!newDB.bebidas.stock[w][id]) newDB.bebidas.stock[w][id] = _EMPTY_LOCS();
         if (loc) {
           // novo formato por local
-          DB.bebidas.stock[w][id][loc] = r.qty || 0;
+          newDB.bebidas.stock[w][id][loc] = r.qty || 0;
         } else {
           // compatibilidade: registro antigo (total único) → vai pro estoque
-          DB.bebidas.stock[w][id].estoque = (DB.bebidas.stock[w][id].estoque || 0) + (r.qty || 0);
+          newDB.bebidas.stock[w][id].estoque = (newDB.bebidas.stock[w][id].estoque || 0) + (r.qty || 0);
         }
       }
     } else if (r.app_type === 'cervejas') {
       if (r.week_label === MIN_LABEL) {
         // item_id aqui é apenas o id do produto (sem local)
-        DB.cervejas.mins[r.item_id] = r.min_qty || 0;
+        newDB.cervejas.mins[r.item_id] = r.min_qty || 0;
       } else {
         const w = weekLabelToNum(r.week_label);
-        if (!w || !DB.cervejas.stock[w]) return;
+        if (!w || !newDB.cervejas.stock[w]) return;
         // item_id no formato "<id>__<local>"
         const parts = String(r.item_id).split('__');
         const id = parts[0];
         const loc = parts[1] || 'estoque';
-        if (!DB.cervejas.stock[w][id]) DB.cervejas.stock[w][id] = _EMPTY_LOCS();
-        DB.cervejas.stock[w][id][loc] = r.qty || 0;
+        if (!newDB.cervejas.stock[w][id]) newDB.cervejas.stock[w][id] = _EMPTY_LOCS();
+        newDB.cervejas.stock[w][id][loc] = r.qty || 0;
       }
     } else if (r.app_type === 'alimentos') {
       if (r.week_label === MIN_LABEL) {
-        DB.alimentos.mins[r.item_name] = r.min_qty || 0;
+        newDB.alimentos.mins[r.item_name] = r.min_qty || 0;
       } else {
         const w = weekLabelToNum(r.week_label);
-        if (w) { const idx = w - 1; if (idx >= 0 && idx < 5) DB.alimentos.counts[idx][r.item_name] = r.qty || 0; }
+        if (w) { const idx = w - 1; if (idx >= 0 && idx < 5) newDB.alimentos.counts[idx][r.item_name] = r.qty || 0; }
       }
     }
   });
 
+  DB = newDB;
   saveLocalSnapshot();
 }
 
@@ -3298,15 +3304,41 @@ async function reorderCfgItem(type, catIdx, fromIdx, toIdx) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // REALTIME — escuta mudanças feitas por outros dispositivos/usuários e atualiza a UI
 // ═══════════════════════════════════════════════════════════════════════════════
+// Evita que múltiplos eventos de realtime (ex: os 6 upserts de um único item
+// de Bebidas/Cervejas, um por local) disparem várias fetchAllData() em
+// paralelo. Isso é o que causava itens somem alguns segundos depois de
+// digitados: uma fetchAllData mais lenta terminava por último com dados
+// desatualizados e sobrescrevia o que você tinha acabado de contar.
+let _rtDebounceTimer = null;
+let _rtFetchInProgress = false;
+let _rtFetchQueued = false;
+
+function scheduleRealtimeRefetch() {
+  if (_rtDebounceTimer) clearTimeout(_rtDebounceTimer);
+  _rtDebounceTimer = setTimeout(runRealtimeRefetch, 700);
+}
+
+async function runRealtimeRefetch() {
+  _rtDebounceTimer = null;
+  if (_rtFetchInProgress) { _rtFetchQueued = true; return; }
+  _rtFetchInProgress = true;
+  try {
+    await fetchAllData();
+    refreshCurrentView();
+  } finally {
+    _rtFetchInProgress = false;
+    if (_rtFetchQueued) { _rtFetchQueued = false; scheduleRealtimeRefetch(); }
+  }
+}
+
 function setupRealtime() {
   if (!currentUser || !navigator.onLine || _realtimeChannel) return;
   _realtimeChannel = _supabase
     .channel('inventory_records_changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_records' }, async (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_records' }, (payload) => {
       const row = payload.new || payload.old;
       if (!row || row.user_id !== currentUser.id) return;
-      await fetchAllData();
-      refreshCurrentView();
+      scheduleRealtimeRefetch();
     })
     .subscribe();
 }
