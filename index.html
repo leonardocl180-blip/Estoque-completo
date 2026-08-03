@@ -740,6 +740,29 @@ let isOnline = navigator.onLine;
 let _flushingQueue = false;
 let _realtimeChannel = null;
 
+// ── fetchAllData "seguro" ───────────────────────────────────────────────────
+// Vários pontos do app pedem uma releitura completa dos dados (realtime,
+// flushPendingQueue ao reconectar). Se dois desses pedidos rodarem ao mesmo
+// tempo, cada um monta seu próprio snapshot e o mais lento pode terminar por
+// último com dados mais antigos, sobrescrevendo o que o outro já tinha
+// atualizado — foi isso que fazia itens digitados sumirem sozinhos alguns
+// segundos depois. safeFetchAllData garante que só rode uma busca por vez;
+// se chegar um novo pedido enquanto uma já está em andamento, ele só marca
+// para rodar mais uma vez assim que a atual terminar.
+let _fetchInProgress = false;
+let _fetchQueued = false;
+async function safeFetchAllData(refresh) {
+  if (_fetchInProgress) { _fetchQueued = true; return; }
+  _fetchInProgress = true;
+  try {
+    await fetchAllData();
+    if (refresh) refreshCurrentView();
+  } finally {
+    _fetchInProgress = false;
+    if (_fetchQueued) { _fetchQueued = false; await safeFetchAllData(refresh); }
+  }
+}
+
 function lsKey(name) { return `bsb_${name}_${currentUser ? currentUser.id : 'anon'}`; }
 
 function loadQueue() {
@@ -859,7 +882,7 @@ async function flushPendingQueue() {
   updateOfflineBanner();
   if (syncedCount > 0) {
     showToast(`✅ ${syncedCount} alteração(ões) sincronizada(s)`);
-    await fetchAllData();
+    await safeFetchAllData(false);
     await fetchCatalogConfig();
     refreshCurrentView();
   }
@@ -1149,20 +1172,39 @@ function bGetTotal(id, week) {
   const d = bGetItemData(id, week);
   return LOCAIS.reduce((s, l) => s + (d[l.id] || 0), 0);
 }
+// Salva TODOS os locais de um item (usado só quando o id do item muda —
+// renameItemIdInData — já que aí é preciso migrar tudo de uma vez). Os 6
+// upserts rodam em paralelo (Promise.all) em vez de um por vez.
 async function bSetItemData(id, week, data) {
   if (!DB.bebidas.stock[week]) DB.bebidas.stock[week] = {};
   DB.bebidas.stock[week][id] = data;
   const meta = findBebidaMeta(id);
-  for (const loc of LOCAIS) {
-    await upsertRecord({
-      app_type: 'bebidas',
-      week_label: WEEK_LABELS[week],
-      item_id: `${id}__${loc.id}`,
-      item_name: meta.nome,
-      category_name: `${meta.cat} · ${loc.label}`,
-      qty: data[loc.id] || 0
-    });
-  }
+  await Promise.all(LOCAIS.map(loc => upsertRecord({
+    app_type: 'bebidas',
+    week_label: WEEK_LABELS[week],
+    item_id: `${id}__${loc.id}`,
+    item_name: meta.nome,
+    category_name: `${meta.cat} · ${loc.label}`,
+    qty: data[loc.id] || 0
+  })));
+}
+// Salva SÓ o local que mudou (1 upsert em vez de 6). É o que a tela de
+// contagem usa a cada toque em +/- — muito mais rápido que reenviar os 6
+// locais inteiros a cada alteração de um só.
+async function bSetLoc(id, week, loc, qty) {
+  if (!DB.bebidas.stock[week]) DB.bebidas.stock[week] = {};
+  if (!DB.bebidas.stock[week][id]) DB.bebidas.stock[week][id] = _EMPTY_LOCS();
+  DB.bebidas.stock[week][id][loc] = qty;
+  const meta = findBebidaMeta(id);
+  const locInfo = LOCAIS.find(l => l.id === loc);
+  await upsertRecord({
+    app_type: 'bebidas',
+    week_label: WEEK_LABELS[week],
+    item_id: `${id}__${loc}`,
+    item_name: meta.nome,
+    category_name: `${meta.cat} · ${locInfo ? locInfo.label : loc}`,
+    qty
+  });
 }
 function bGetMin(id) { return DB.bebidas.mins[id] || 0; }
 async function bSetMin(id, val) {
@@ -1200,21 +1242,38 @@ function cGetTotal(id, week) {
   const d = cGetItemData(id, week);
   return LOCAIS.reduce((s,l) => s + (d[l.id] || 0), 0);
 }
+// Salva TODOS os locais de um item (usado só quando o id do item muda —
+// renameItemIdInData). Os 6 upserts rodam em paralelo (Promise.all).
 async function cSetItemData(id, week, data) {
   if (!DB.cervejas.stock[week]) DB.cervejas.stock[week] = {};
   DB.cervejas.stock[week][id] = data;
   const meta = findCervejaMeta(id);
   // Salva um registro por local (item_id = "<id>__<local>")
-  for (const loc of LOCAIS) {
-    await upsertRecord({
-      app_type: 'cervejas',
-      week_label: WEEK_LABELS[week],
-      item_id: `${id}__${loc.id}`,
-      item_name: meta.nome,
-      category_name: `${meta.cat} · ${loc.label}`,
-      qty: data[loc.id] || 0
-    });
-  }
+  await Promise.all(LOCAIS.map(loc => upsertRecord({
+    app_type: 'cervejas',
+    week_label: WEEK_LABELS[week],
+    item_id: `${id}__${loc.id}`,
+    item_name: meta.nome,
+    category_name: `${meta.cat} · ${loc.label}`,
+    qty: data[loc.id] || 0
+  })));
+}
+// Salva SÓ o local que mudou (1 upsert em vez de 6) — usado a cada toque
+// em +/- na tela de contagem.
+async function cSetLoc(id, week, loc, qty) {
+  if (!DB.cervejas.stock[week]) DB.cervejas.stock[week] = {};
+  if (!DB.cervejas.stock[week][id]) DB.cervejas.stock[week][id] = _EMPTY_LOCS();
+  DB.cervejas.stock[week][id][loc] = qty;
+  const meta = findCervejaMeta(id);
+  const locInfo = LOCAIS.find(l => l.id === loc);
+  await upsertRecord({
+    app_type: 'cervejas',
+    week_label: WEEK_LABELS[week],
+    item_id: `${id}__${loc}`,
+    item_name: meta.nome,
+    category_name: `${meta.cat} · ${locInfo ? locInfo.label : loc}`,
+    qty
+  });
 }
 function cGetMin(id) { return DB.cervejas.mins[id] || 0; }
 async function cSetMin(id, val) {
@@ -1608,11 +1667,12 @@ function renderMinimosBebidas() {
   });
   const ml=document.getElementById('minimosList'); if(ml) ml.innerHTML=html;
 }
-async function saveMinBebida(id,inp) { const v=parseInt(inp.value)||0; await bSetMin(id,v); inp.classList.toggle('zero',v===0); }
+async function saveMinBebida(id,inp) { const v=parseInt(inp.value)||0; const saved=bSetMin(id,v); inp.classList.toggle('zero',v===0); await saved; }
 async function adjMinBebida(id,delta) {
   const cur=bGetMin(id),nv=Math.max(0,cur+delta);
-  await bSetMin(id,nv);
+  const saved=bSetMin(id,nv);
   const inp=document.getElementById(`min-${id}`);if(inp){inp.value=nv;inp.classList.toggle('zero',nv===0);}
+  await saved;
 }
 function exportCSVBebidas() {
   const stock=getResumoBebidas();
@@ -1924,10 +1984,12 @@ function renderMinimosCervejas() {
   });
   const ml=document.getElementById('minimosList');if(ml) ml.innerHTML=html;
 }
-async function saveMinCerveja(id,inp) { const v=parseInt(inp.value)||0; await cSetMin(id,v); inp.classList.toggle('zero',v===0); }
+async function saveMinCerveja(id,inp) { const v=parseInt(inp.value)||0; const saved=cSetMin(id,v); inp.classList.toggle('zero',v===0); await saved; }
 async function adjMinCerveja(id,delta) {
-  const cur=cGetMin(id),nv=Math.max(0,cur+delta);await cSetMin(id,nv);
+  const cur=cGetMin(id),nv=Math.max(0,cur+delta);
+  const saved=cSetMin(id,nv);
   const inp=document.getElementById(`cmin-${id}`);if(inp){inp.value=nv;inp.classList.toggle('zero',nv===0);}
+  await saved;
 }
 
 function exportCSVCervejas() {
@@ -2173,10 +2235,14 @@ function buildFoodItems() {
 
 async function changeFoodCount(item,delta,row,display) {
   const nv=Math.max(0,aGetCount(item,foodCurrentWeek)+delta);
-  await aSetCount(item,foodCurrentWeek,nv);
+  // aSetCount atualiza DB.alimentos.counts em memória de forma síncrona antes
+  // do primeiro await — por isso a tela já pode atualizar antes de esperar o
+  // Supabase responder (atualização otimista de verdade).
+  const saved=aSetCount(item,foodCurrentWeek,nv);
   display.value=nv;display.className='count-display'+(nv===0?' zero':'');
   display.classList.add('bump');setTimeout(()=>display.classList.remove('bump'),200);
   updateFoodRowStatus(item,row,nv);
+  await saved;
 }
 
 function updateFoodRowStatus(item,row,qty) {
@@ -2241,9 +2307,10 @@ async function confirmFoodModal() {
   closeFoodModal();
   try {
     const nv=aGetCount(item,foodCurrentWeek)+add;
-    await aSetCount(item,foodCurrentWeek,nv);
+    const saved=aSetCount(item,foodCurrentWeek,nv);
     if(display){display.value=nv;display.className='count-display';}
     if(row) updateFoodRowStatus(item,row,nv);
+    await saved;
   } finally {
     _foodConfirmInFlight=false;
   }
@@ -2497,7 +2564,7 @@ function buildFoodConfig() {
       const btnP=document.createElement('button');btnP.className='min-btn plus';btnP.textContent='+';
       btnM.onclick=()=>changeFoodMin(item,-1,valEl);
       btnP.onclick=()=>changeFoodMin(item,1,valEl);
-      valEl.oninput=async()=>{const nv=Math.max(0,parseInt(valEl.value)||0);await aSetMin(item,nv);valEl.className='min-val'+(nv===0?' zero':'');};
+      valEl.oninput=async()=>{const nv=Math.max(0,parseInt(valEl.value)||0);const saved=aSetMin(item,nv);valEl.className='min-val'+(nv===0?' zero':'');await saved;};
       valEl.onblur=()=>{valEl.value=aGetMin(item);};
       ctrl.appendChild(btnM);ctrl.appendChild(valEl);ctrl.appendChild(btnP);
       row.appendChild(name);row.appendChild(ctrl);sec.appendChild(row);
@@ -2506,8 +2573,10 @@ function buildFoodConfig() {
   });
 }
 async function changeFoodMin(item,delta,el) {
-  const nv=Math.max(0,aGetMin(item)+delta);await aSetMin(item,nv);
+  const nv=Math.max(0,aGetMin(item)+delta);
+  const saved=aSetMin(item,nv);
   el.value=nv;el.className='min-val'+(nv===0?' zero':'');
+  await saved;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2807,29 +2876,22 @@ async function confirmAdj() {
   // Fecha o popover imediatamente (UI otimista) para que ele não fique "preso" aberto
   // enquanto a chamada assíncrona de salvamento ainda está em andamento.
   closePopover();
+  // Só o local afetado é salvo (1 upsert), não os 6 locais do item inteiro.
+  const loc = locTarget==='total' ? 'estoque' : locTarget;
   try {
     if(app==='b'){
-      if(locTarget==='total'){
-        const d=bGetItemData(id,currentWeek);
-        d.estoque=Math.max(0,(d.estoque||0)+delta);
-        await bSetItemData(id,currentWeek,d);
-      } else {
-        const d=bGetItemData(id,currentWeek);
-        d[locTarget]=Math.max(0,(d[locTarget]||0)+delta);
-        await bSetItemData(id,currentWeek,d);
-      }
+      const nv=Math.max(0,(bGetItemData(id,currentWeek)[loc]||0)+delta);
+      // bSetLoc já atualiza DB.bebidas.stock em memória de forma síncrona
+      // antes do primeiro await; por isso dá pra atualizar o card ANTES de
+      // esperar a resposta do Supabase (atualização otimista de verdade).
+      const saved=bSetLoc(id,currentWeek,loc,nv);
       refreshCardBebida(id);
+      await saved;
     } else if(app==='c') {
-      if(locTarget==='total'){
-        const d=cGetItemData(id,currentWeek);
-        d.estoque=Math.max(0,(d.estoque||0)+delta);
-        await cSetItemData(id,currentWeek,d);
-      } else {
-        const d=cGetItemData(id,currentWeek);
-        d[locTarget]=Math.max(0,(d[locTarget]||0)+delta);
-        await cSetItemData(id,currentWeek,d);
-      }
+      const nv=Math.max(0,(cGetItemData(id,currentWeek)[loc]||0)+delta);
+      const saved=cSetLoc(id,currentWeek,loc,nv);
       refreshCardCerveja(id);
+      await saved;
     }
   } finally {
     _adjConfirmInFlight=false;
@@ -3200,33 +3262,38 @@ function editCfgCode(el, type, catIdx, itIdx) {
 // Quando um código (id) de bebida/cerveja é alterado, migra os dados salvos (estoque, mínimos) para o novo id
 async function renameItemIdInData(type, oldId, newId) {
   const oldKey = String(oldId), newKey = String(newId);
+  // Todas as semanas/locais mudam de id juntos aqui, então não há problema em
+  // disparar tudo em paralelo (Promise.all) em vez de esperar um de cada vez —
+  // reduz bastante a demora ao renomear um código de item.
+  const tasks = [];
   if (type === 'bebidas') {
     for (const w of [1,2,3,4,5]) {
       if (DB.bebidas.stock[w] && DB.bebidas.stock[w][oldKey] !== undefined) {
         DB.bebidas.stock[w][newKey] = DB.bebidas.stock[w][oldKey];
         delete DB.bebidas.stock[w][oldKey];
-        await bSetItemData(newKey, w, DB.bebidas.stock[w][newKey]);
+        tasks.push(bSetItemData(newKey, w, DB.bebidas.stock[w][newKey]));
       }
     }
     if (DB.bebidas.mins[oldKey] !== undefined) {
       DB.bebidas.mins[newKey] = DB.bebidas.mins[oldKey];
       delete DB.bebidas.mins[oldKey];
-      await bSetMin(newKey, DB.bebidas.mins[newKey]);
+      tasks.push(bSetMin(newKey, DB.bebidas.mins[newKey]));
     }
   } else if (type === 'cervejas') {
     for (const w of [1,2,3,4,5]) {
       if (DB.cervejas.stock[w] && DB.cervejas.stock[w][oldKey] !== undefined) {
         DB.cervejas.stock[w][newKey] = DB.cervejas.stock[w][oldKey];
         delete DB.cervejas.stock[w][oldKey];
-        await cSetItemData(newKey, w, DB.cervejas.stock[w][newKey]);
+        tasks.push(cSetItemData(newKey, w, DB.cervejas.stock[w][newKey]));
       }
     }
     if (DB.cervejas.mins[oldKey] !== undefined) {
       DB.cervejas.mins[newKey] = DB.cervejas.mins[oldKey];
       delete DB.cervejas.mins[oldKey];
-      await cSetMin(newKey, DB.cervejas.mins[newKey]);
+      tasks.push(cSetMin(newKey, DB.cervejas.mins[newKey]));
     }
   }
+  await Promise.all(tasks);
 }
 
 // ─── Drag-and-drop para reordenar itens ─────────────────────────────────────
@@ -3304,31 +3371,15 @@ async function reorderCfgItem(type, catIdx, fromIdx, toIdx) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // REALTIME — escuta mudanças feitas por outros dispositivos/usuários e atualiza a UI
 // ═══════════════════════════════════════════════════════════════════════════════
-// Evita que múltiplos eventos de realtime (ex: os 6 upserts de um único item
-// de Bebidas/Cervejas, um por local) disparem várias fetchAllData() em
-// paralelo. Isso é o que causava itens somem alguns segundos depois de
-// digitados: uma fetchAllData mais lenta terminava por último com dados
-// desatualizados e sobrescrevia o que você tinha acabado de contar.
+// Agrupa rajadas de eventos de realtime (ex.: os 6 upserts de um único item
+// de Bebidas/Cervejas, um por local) numa única releitura, 700ms depois do
+// último evento — e essa releitura passa pela trava de safeFetchAllData
+// (definida lá em cima, perto da fila offline), então nunca roda ao mesmo
+// tempo que uma sincronização da fila pendente, por exemplo.
 let _rtDebounceTimer = null;
-let _rtFetchInProgress = false;
-let _rtFetchQueued = false;
-
 function scheduleRealtimeRefetch() {
   if (_rtDebounceTimer) clearTimeout(_rtDebounceTimer);
-  _rtDebounceTimer = setTimeout(runRealtimeRefetch, 700);
-}
-
-async function runRealtimeRefetch() {
-  _rtDebounceTimer = null;
-  if (_rtFetchInProgress) { _rtFetchQueued = true; return; }
-  _rtFetchInProgress = true;
-  try {
-    await fetchAllData();
-    refreshCurrentView();
-  } finally {
-    _rtFetchInProgress = false;
-    if (_rtFetchQueued) { _rtFetchQueued = false; scheduleRealtimeRefetch(); }
-  }
+  _rtDebounceTimer = setTimeout(() => { _rtDebounceTimer = null; safeFetchAllData(true); }, 700);
 }
 
 function setupRealtime() {
