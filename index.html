@@ -1411,6 +1411,15 @@ async function loadApp(app) {
   foodResumoWeek = 5;
   foodActiveTab = 'contagem';
 
+  // Corrige o destaque do botão de semana: como #weekBar é um único elemento
+  // fixo compartilhado entre Bebidas e Cervejas (não é recriado a cada troca
+  // de app), o botão "aceso" de uma sessão anterior ficava preso mesmo depois
+  // de currentWeek já ter voltado pra 1 aqui em cima. Isso fazia a 1ª semana
+  // ser exibida corretamente mas com o botão de outra semana brilhando —
+  // e no primeiro clique depois disso, currentWeek finalmente saltava para
+  // valer, dando a impressão de "contagem errada" nesse instante.
+  document.querySelectorAll('#weekBar .week-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+
   const weekBar = document.getElementById('weekBar');
   const fab = document.getElementById('fabClear');
   const tabBar = document.getElementById('tabBar');
@@ -1479,6 +1488,7 @@ function renderBebidas() {
         <div class="action-btns">
           <button class="action-btn" onclick="exportCSVBebidas()">⬇ CSV</button>
           <button class="action-btn" onclick="exportPDFBebidas()">📄 PDF</button>
+          <button class="action-btn" onclick="exportPDFBebidasSimples()">📋 Simples</button>
         </div>
         <div class="status-cards">
           <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Faltando</div></div>
@@ -1824,6 +1834,54 @@ function exportPDFBebidas() {
   showToast('PDF exportado ✓');
 }
 
+// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// itens com a contagem, incluindo os zerados. Mesmo formato do "Simples" do
+// Analytics, só que restrito a esse app.
+function exportPDFBebidasSimples() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, margin=14, colW=pageW-margin*2;
+  const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
+  const stock = getResumoBebidas();
+  const now = new Date().toLocaleString('pt-BR');
+
+  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO SIMPLIFICADO — BEBIDAS', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  let y=34;
+  const body=[];
+  CAT_BEBIDAS.forEach(cat=>{
+    body.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.itens.forEach(it=>{ body.push([it.nome,String(stock[it.id]||0)]); });
+  });
+  doc.autoTable({startY:y,head:[['Bebida','Qtd']],body,theme:'grid',
+    styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+    headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+    columnStyles:{1:{halign:'center'}},
+    margin:{left:margin,right:margin}});
+  y=doc.lastAutoTable.finalY+5;
+
+  const totalQty = CAT_BEBIDAS.flatMap(c=>c.itens).reduce((s,it)=>s+(stock[it.id]||0),0);
+  doc.setFillColor(240,240,240); doc.setDrawColor(200,200,200);
+  doc.rect(margin,y,colW,9,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+  doc.text('TOTAL',margin+3,y+6);
+  doc.text(String(totalQty),pageW-margin-3,y+6,{align:'right'});
+
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Relatório Simplificado',margin,290);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
+  }
+  doc.save(`bebidas-simplificado-${resumoWeek==='all'?'todas':resumoWeek+'sem'}-${pdfDateSuffix()}.pdf`);
+  showToast('PDF exportado ✓');
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP: CERVEJAS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1840,6 +1898,7 @@ function renderCervejas() {
         <div class="action-btns">
           <button class="action-btn" onclick="exportCSVCervejas()">⬇ CSV</button>
           <button class="action-btn" onclick="exportPDFCervejas()">📄 PDF</button>
+          <button class="action-btn" onclick="exportPDFCervejasSimples()">📋 Simples</button>
         </div>
         <div class="status-cards">
           <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Faltando</div></div>
@@ -2152,6 +2211,57 @@ function exportPDFCervejas() {
   showToast('PDF exportado ✓');
 }
 
+// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// itens com a contagem, incluindo os zerados. Mesmo formato do "Simples" do
+// Analytics, só que restrito a esse app.
+function exportPDFCervejasSimples() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, margin=14, colW=pageW-margin*2;
+  const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  const now = new Date().toLocaleString('pt-BR');
+
+  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO SIMPLIFICADO — CERVEJAS', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  let y=34, totalQty=0;
+  const body=[];
+  CAT_CERVEJAS.forEach(cat=>{
+    body.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.itens.forEach(it=>{
+      const qty=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+      totalQty+=qty;
+      body.push([it.nome,String(qty)]);
+    });
+  });
+  doc.autoTable({startY:y,head:[['Cerveja','Qtd']],body,theme:'grid',
+    styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+    headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+    columnStyles:{1:{halign:'center'}},
+    margin:{left:margin,right:margin}});
+  y=doc.lastAutoTable.finalY+5;
+
+  doc.setFillColor(240,240,240); doc.setDrawColor(200,200,200);
+  doc.rect(margin,y,colW,9,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+  doc.text('TOTAL',margin+3,y+6);
+  doc.text(String(totalQty),pageW-margin-3,y+6,{align:'right'});
+
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Relatório Simplificado',margin,290);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
+  }
+  doc.save(`cervejas-simplificado-${resumoWeek==='all'?'todas':resumoWeek+'sem'}-${pdfDateSuffix()}.pdf`);
+  showToast('PDF exportado ✓');
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // APP: ALIMENTOS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2172,6 +2282,7 @@ function buildFoodHTML() {
         <div style="display:flex;gap:6px">
           <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportCSVAlimentos()">⬇ CSV</button>
           <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportPDFAlimentos()">📄 PDF</button>
+          <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportPDFAlimentosSimples()">📋 Simples</button>
         </div>
       </div>
       <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px" id="food-resumo-week-tabs"></div>
@@ -2565,6 +2676,56 @@ function exportPDFAlimentos() {
   showToast('PDF exportado ✓');
 }
 
+// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// itens com a contagem, incluindo os zerados. Mesmo formato do "Simples" do
+// Analytics, só que restrito a esse app.
+function exportPDFAlimentosSimples() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, margin=14, colW=pageW-margin*2;
+  const weeks = foodResumoWeek===5 ? [0,1,2,3,4] : [foodResumoWeek];
+  const semLabel = foodResumoWeek===5 ? 'Todas as Semanas' : `${foodResumoWeek+1}ª Semana`;
+  const agg = {};
+  weeks.forEach(w => Object.entries(DB.alimentos.counts[w]).forEach(([item,val]) => { if(val>0) agg[item]=(agg[item]||0)+val; }));
+  const now = new Date().toLocaleString('pt-BR');
+
+  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO SIMPLIFICADO — ALIMENTOS', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  let y=34;
+  const body=[];
+  CAT_ALIMENTOS.forEach(cat=>{
+    body.push([{content:cat.name,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.items.forEach(item=>{ body.push([item,String(agg[item]||0)]); });
+  });
+  doc.autoTable({startY:y,head:[['Item','Qtd']],body,theme:'grid',
+    styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+    headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+    columnStyles:{1:{halign:'center'}},
+    margin:{left:margin,right:margin}});
+  y=doc.lastAutoTable.finalY+5;
+
+  const totalQty = Object.values(agg).reduce((s,v)=>s+v,0);
+  doc.setFillColor(240,240,240); doc.setDrawColor(200,200,200);
+  doc.rect(margin,y,colW,9,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(30,30,30);
+  doc.text('TOTAL',margin+3,y+6);
+  doc.text(String(totalQty),pageW-margin-3,y+6,{align:'right'});
+
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Relatório Simplificado',margin,290);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
+  }
+  doc.save(`alimentos-simplificado-${foodResumoWeek===5?'todas':(foodResumoWeek+1)+'sem'}-${pdfDateSuffix()}.pdf`);
+  showToast('PDF exportado ✓');
+}
+
 function buildFoodConfig() {
   const c=document.getElementById('food-config-container');if(!c) return;
   c.innerHTML='';
@@ -2607,7 +2768,10 @@ function renderAnalytics() {
       <div class="analytics-wrap">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <div class="analytics-title">📊 Analytics Geral</div>
-          <button class="action-btn" style="flex:none;padding:7px 14px" onclick="exportPDFAnalytics()">📄 PDF</button>
+          <div style="display:flex;gap:6px">
+            <button class="action-btn" style="flex:none;padding:7px 10px" onclick="exportPDFAnalytics()">📄 PDF</button>
+            <button class="action-btn" style="flex:none;padding:7px 10px" onclick="exportPDFAnalyticsSimples()">📋 Simples</button>
+          </div>
         </div>
         <div class="analytics-sub">Resumo consolidado de todos os estoques</div>
         <div class="an-week-bar" id="anWeekBar"></div>
@@ -2835,6 +2999,84 @@ function exportPDFAnalytics() {
     doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
   }
   doc.save(`analytics-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
+  showToast('PDF exportado ✓');
+}
+
+// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// itens de todos os apps com a contagem, incluindo os que estão zerados. Útil
+// pra conferência rápida ("bateu tudo?") em vez de análise de status.
+function exportPDFAnalyticsSimples() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, margin=14, colW=pageW-margin*2;
+  const semLabel = anWeek==='all'?'Todas as Semanas':`${anWeek}ª Semana`;
+  const weeks_n = anWeek==='all'?[1,2,3,4,5]:[anWeek];
+  const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
+  const now = new Date().toLocaleString('pt-BR');
+
+  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.text('RELATÓRIO SIMPLIFICADO — TODAS AS CONTAGENS', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  let y=34;
+  function sectionTitle(title){
+    if (y>260) { doc.addPage(); y=20; }
+    doc.setFillColor(50,50,50); doc.rect(margin,y,colW,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+    doc.text(title,margin+3,y+4.8); y+=9;
+  }
+  function itemsTable(body){
+    doc.autoTable({startY:y,head:[['Item','Qtd']],body,theme:'grid',
+      styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{1:{halign:'center'}},
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+8;
+  }
+
+  sectionTitle('🥤 BEBIDAS — TODOS OS ITENS');
+  const bBody=[];
+  CAT_BEBIDAS.forEach(cat=>{
+    bBody.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.itens.forEach(it=>{
+      let qty=0; weeks_n.forEach(w=>{qty+=bGetTotal(it.id,w);});
+      bBody.push([it.nome,String(qty)]);
+    });
+  });
+  itemsTable(bBody);
+
+  sectionTitle('🍺 CERVEJAS — TODOS OS ITENS');
+  const cBody=[];
+  CAT_CERVEJAS.forEach(cat=>{
+    cBody.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.itens.forEach(it=>{
+      let qty=0; weeks_n.forEach(w=>{qty+=cGetTotal(it.id,w);});
+      cBody.push([it.nome,String(qty)]);
+    });
+  });
+  itemsTable(cBody);
+
+  sectionTitle('🍔 ALIMENTOS — TODOS OS ITENS');
+  const aBody=[];
+  CAT_ALIMENTOS.forEach(cat=>{
+    aBody.push([{content:cat.name,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.items.forEach(item=>{
+      let qty=0; weeks_a.forEach(w=>{qty+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
+      aBody.push([item,String(qty)]);
+    });
+  });
+  itemsTable(aBody);
+
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Relatório Simplificado',margin,290);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
+  }
+  doc.save(`relatorio-simplificado-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
   showToast('PDF exportado ✓');
 }
 
