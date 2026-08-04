@@ -1089,6 +1089,20 @@ async function fetchAllData() {
   // (o que fazia itens recém-digitados sumirem por alguns segundos).
   const newDB = emptyDB();
 
+  // Pré-varredura: descobre quais pares (semana,item) de bebidas já têm
+  // registro no formato novo (por local). Isso evita que um registro antigo
+  // (formato único, sem "__local") seja somado EM CIMA de um registro novo
+  // do mesmo item/semana — o que dobrava a contagem sempre que um item
+  // contado antes da migração pra locais era recontado depois, já que os
+  // dois registros continuam existindo lado a lado no banco.
+  const bebLocPairs = new Set();
+  rows.forEach(r => {
+    if (r.app_type === 'bebidas' && r.week_label !== MIN_LABEL) {
+      const parts = String(r.item_id).split('__');
+      if (parts[1]) bebLocPairs.add(`${r.week_label}__${parts[0]}`);
+    }
+  });
+
   rows.forEach(r => {
     if (r.app_type === 'bebidas') {
       if (r.week_label === MIN_LABEL) {
@@ -1105,9 +1119,11 @@ async function fetchAllData() {
         if (loc) {
           // novo formato por local
           newDB.bebidas.stock[w][id][loc] = r.qty || 0;
-        } else {
-          // compatibilidade: registro antigo (total único) → vai pro estoque
-          newDB.bebidas.stock[w][id].estoque = (newDB.bebidas.stock[w][id].estoque || 0) + (r.qty || 0);
+        } else if (!bebLocPairs.has(`${r.week_label}__${id}`)) {
+          // compatibilidade: registro antigo (total único), só usado quando
+          // esse item/semana nunca foi recontado no formato novo — senão o
+          // registro novo já cobre o valor certo e o antigo é só um resíduo.
+          newDB.bebidas.stock[w][id].estoque = r.qty || 0;
         }
       }
     } else if (r.app_type === 'cervejas') {
@@ -1352,8 +1368,7 @@ function findAlimentoMeta(item) {
 
 function itemStatus(qty, min) {
   if (min === 0) return qty > 0 ? 'ok' : 'none';
-  if (qty < min) return 'missing';
-  if (qty < min * 1.5) return 'low';
+  if (qty <= min) return 'missing';
   return 'ok';
 }
 
@@ -1490,9 +1505,8 @@ function renderBebidas() {
           <button class="action-btn" onclick="exportPDFBebidas()">📄 PDF</button>
           <button class="action-btn" onclick="exportPDFBebidasSimples()">📋 Simples</button>
         </div>
-        <div class="status-cards">
-          <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Faltando</div></div>
-          <div class="status-card low"><div class="sc-num" id="sc-low">0</div><div class="sc-label">Baixo</div></div>
+        <div class="status-cards" style="grid-template-columns:repeat(2,1fr)">
+          <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Falta</div></div>
           <div class="status-card ok"><div class="sc-num" id="sc-ok">0</div><div class="sc-label">OK</div></div>
         </div>
         <div id="resumoContent"></div>
@@ -1548,7 +1562,7 @@ function renderContarBebidas() {
       const total = bGetTotal(it.id, currentWeek);
       const min = bGetMin(it.id);
       const st = itemStatus(total, min);
-      const cls = st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':'';
+      const cls = st==='missing'?'critical':total>0?'has-qty':'';
       const isExp = bebExpanded[it.id] || false;
       const locData = bGetItemData(it.id, currentWeek);
       let locHtml = LOCAIS.map(loc => {
@@ -1598,7 +1612,7 @@ function toggleLocBeb(id) {
 function refreshCardBebida(id) {
   const total=bGetTotal(id,currentWeek), min=bGetMin(id), st=itemStatus(total,min);
   const card=document.getElementById(`card-${id}`); if(!card) return;
-  card.className=`item-card-beer ${st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':''}`;
+  card.className=`item-card-beer ${st==='missing'?'critical':total>0?'has-qty':''}`;
   const qd=document.getElementById(`qty-${id}`); if(qd){qd.textContent=total;qd.className=`qty-display-beer${total===0?' zero':''}`;}
   LOCAIS.forEach(loc=>{
     const lq=(bGetItemData(id,currentWeek)[loc.id]||0);
@@ -1620,28 +1634,21 @@ function renderResumoBebidas() {
     });
   }
   const stock = getResumoBebidas();
-  const missing=[],low=[],ok=[],zerados=[];
+  const missing=[],ok=[],zerados=[];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
-    else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
     else if(st==='ok') ok.push({...it,qty,min,cat:cat.nome});
     else if(qty===0) zerados.push({...it,qty,min,cat:cat.nome});
   }));
   const scM=document.getElementById('sc-missing');if(scM) scM.textContent=missing.length;
-  const scL=document.getElementById('sc-low');if(scL) scL.textContent=low.length;
   const scO=document.getElementById('sc-ok');if(scO) scO.textContent=ok.length;
 
   let html='';
   const semLabel = resumoWeek==='all'?'Todas as semanas':`${resumoWeek}ª Semana`;
   if(missing.length){
-    html+=`<div class="section-title red">🚨 Faltando</div><div class="alert-cards">`;
+    html+=`<div class="section-title red">🚨 Falta</div><div class="alert-cards">`;
     missing.forEach(it=>{html+=`<div class="alert-card missing"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">${it.cat} · mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
-    html+='</div>';
-  }
-  if(low.length){
-    html+=`<div class="section-title yellow">⚠️ Estoque Baixo</div><div class="alert-cards">`;
-    low.forEach(it=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">${it.cat} · mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
     html+='</div>';
   }
   if(zerados.length){
@@ -1656,7 +1663,7 @@ function renderResumoBebidas() {
     allItems.forEach(it=>{
       if(it.cat!==lastCat){html+=`<tr class="cat-row"><td colspan="5">${it.cat}</td></tr>`;lastCat=it.cat;}
       const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
-      html+=`<tr><td style="color:var(--text-muted);font-size:10px">#${it.id}</td><td>${it.nome}</td><td><b>${qty}</b></td><td>${min||'—'}</td><td><span class="status-badge ${st}">${st==='ok'?'OK':st==='low'?'Baixo':'—'}</span></td></tr>`;
+      html+=`<tr><td style="color:var(--text-muted);font-size:10px">#${it.id}</td><td>${it.nome}</td><td><b>${qty}</b></td><td>${min||'—'}</td><td><span class="status-badge ${st}">${st==='ok'?'OK':'—'}</span></td></tr>`;
     });
     html+='</tbody></table>';
   }
@@ -1710,7 +1717,7 @@ function exportCSVBebidas() {
     const total=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(total,min);
     const d=_EMPTY_LOCS();
     weeks.forEach(w=>{ const dd=bGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
-    rows.push([it.id,it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'Sem mín']);
+    rows.push([it.id,it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Falta':st==='ok'?'OK':'Sem mín']);
   }));
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download=`estoque-bebidas-${semLabel}.csv`;a.click();
@@ -1726,26 +1733,24 @@ function exportPDFBebidas() {
   const now = new Date().toLocaleString('pt-BR');
 
   // Calcular cards
-  const missing=[],low=[],okList=[];
+  const missing=[],okList=[];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
-    else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
     else if(st==='ok') okList.push({...it,qty,min,cat:cat.nome});
   }));
   const totalQty = CAT_BEBIDAS.flatMap(c=>c.itens).reduce((s,it)=>s+(stock[it.id]||0),0);
 
-  // Cabeçalho preto
-  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  // Cabeçalho
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO DE ESTOQUE — BEBIDAS', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   // Cards de resumo
   let y=34;
-  const cardW=(colW-8)/3;
-  [{label:'FALTANDO',num:missing.length,r:220,g:60,b:60},{label:'BAIXO',num:low.length,r:220,g:170,b:40},{label:'OK',num:okList.length,r:60,g:175,b:100}]
+  const cardW=(colW-4)/2;
+  [{label:'FALTA',num:missing.length,r:220,g:60,b:60},{label:'OK',num:okList.length,r:60,g:175,b:100}]
   .forEach((c,i)=>{
     const cx=margin+i*(cardW+4);
     doc.setFillColor(245,245,245); doc.setDrawColor(220,220,220);
@@ -1763,28 +1768,15 @@ function exportPDFBebidas() {
     doc.text(title,margin+3,y+4.8); y+=9;
   }
 
-  // Faltando
+  // Falta
   if(missing.length){
-    sectionTitle('FALTANDO / ABAIXO DO MÍNIMO',210,60,60);
+    sectionTitle('FALTA / ABAIXO DO MÍNIMO',210,60,60);
     doc.autoTable({ startY:y,
       head:[['Cód.','Bebida','Categoria','Qtd','Mínimo','Falta']],
       body:missing.map(it=>[String(it.id),it.nome,it.cat,String(it.qty),String(it.min),String(it.min-it.qty)]),
       theme:'grid', styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
       headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
       columnStyles:{0:{cellWidth:14,textColor:[120,120,120]},3:{halign:'center'},4:{halign:'center'},5:{halign:'center',textColor:[210,60,60],fontStyle:'bold'}},
-      margin:{left:margin,right:margin}});
-    y=doc.lastAutoTable.finalY+5;
-  }
-
-  // Baixo
-  if(low.length){
-    sectionTitle('ESTOQUE BAIXO',190,140,30);
-    doc.autoTable({ startY:y,
-      head:[['Cód.','Bebida','Categoria','Qtd','Mínimo']],
-      body:low.map(it=>[String(it.id),it.nome,it.cat,String(it.qty),String(it.min)]),
-      theme:'grid', styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
-      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
-      columnStyles:{0:{cellWidth:14,textColor:[120,120,120]},3:{halign:'center',textColor:[190,140,30],fontStyle:'bold'},4:{halign:'center'}},
       margin:{left:margin,right:margin}});
     y=doc.lastAutoTable.finalY+5;
   }
@@ -1796,7 +1788,7 @@ function exportPDFBebidas() {
     body.push([{content:cat.nome,colSpan:5,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.itens.forEach(it=>{
       const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
-      const stL=st==='missing'?'FALTA':st==='low'?'BAIXO':st==='ok'?'OK':'—';
+      const stL=st==='missing'?'FALTA':st==='ok'?'OK':'—';
       body.push([String(it.id),it.nome,'',String(qty),stL]);
     });
   });
@@ -1809,7 +1801,6 @@ function exportPDFBebidas() {
     didParseCell:(d)=>{
       if(d.section==='body'&&d.column.index===4){
         if(d.cell.raw==='FALTA'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
-        else if(d.cell.raw==='BAIXO'){d.cell.styles.textColor=[190,140,30];d.cell.styles.fontStyle='bold';}
         else if(d.cell.raw==='OK'){d.cell.styles.textColor=[60,160,90];}
       }
     },
@@ -1834,7 +1825,7 @@ function exportPDFBebidas() {
   showToast('PDF exportado ✓');
 }
 
-// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// Versão simplificada: lista TODOS os itens com contagem, mín. e status (falta/ok)
 // itens com a contagem, incluindo os zerados. Mesmo formato do "Simples" do
 // Analytics, só que restrito a esse app.
 function exportPDFBebidasSimples() {
@@ -1846,22 +1837,31 @@ function exportPDFBebidasSimples() {
   const stock = getResumoBebidas();
   const now = new Date().toLocaleString('pt-BR');
 
-  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO SIMPLIFICADO — BEBIDAS', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   let y=34;
   const body=[];
   CAT_BEBIDAS.forEach(cat=>{
-    body.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
-    cat.itens.forEach(it=>{ body.push([it.nome,String(stock[it.id]||0)]); });
+    body.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.itens.forEach(it=>{
+      const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
+      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+      body.push([it.nome,String(qty),stL]);
+    });
   });
-  doc.autoTable({startY:y,head:[['Bebida','Qtd']],body,theme:'grid',
+  doc.autoTable({startY:y,head:[['Bebida','Qtd','Status']],body,theme:'grid',
     styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
     headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
-    columnStyles:{1:{halign:'center'}},
+    columnStyles:{1:{halign:'center'},2:{halign:'center'}},
+    didParseCell:(d)=>{
+      if(d.section==='body'&&d.column.index===2){
+        if(d.cell.raw==='falta'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='ok'){d.cell.styles.textColor=[60,160,90];}
+      }
+    },
     margin:{left:margin,right:margin}});
   y=doc.lastAutoTable.finalY+5;
 
@@ -1900,9 +1900,8 @@ function renderCervejas() {
           <button class="action-btn" onclick="exportPDFCervejas()">📄 PDF</button>
           <button class="action-btn" onclick="exportPDFCervejasSimples()">📋 Simples</button>
         </div>
-        <div class="status-cards">
-          <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Faltando</div></div>
-          <div class="status-card low"><div class="sc-num" id="sc-low">0</div><div class="sc-label">Baixo</div></div>
+        <div class="status-cards" style="grid-template-columns:repeat(2,1fr)">
+          <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Falta</div></div>
           <div class="status-card ok"><div class="sc-num" id="sc-ok">0</div><div class="sc-label">OK</div></div>
         </div>
         <div id="resumoContent"></div>
@@ -1939,7 +1938,7 @@ function renderContarCervejas() {
     html+=`<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div>`;
     items.forEach(it=>{
       const total=cGetTotal(it.id,currentWeek),min=cGetMin(it.id),st=itemStatus(total,min);
-      const cls=st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':'';
+      const cls=st==='missing'?'critical':total>0?'has-qty':'';
       const isExp=beerExpanded[it.id]||false;
       const locData=cGetItemData(it.id,currentWeek);
       let locHtml=LOCAIS.map(loc=>{
@@ -2004,26 +2003,19 @@ function renderResumoCervejas() {
     stock[it.id]=0;
     weeks.forEach(w=>{stock[it.id]+=cGetTotal(it.id,w);});
   }));
-  const missing=[],low=[],ok=[],zerados=[];
+  const missing=[],ok=[],zerados=[];
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=stock[it.id]||0,min=cGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
-    else if(st==='low') low.push({...it,qty,min,cat:cat.nome});
     else if(st==='ok') ok.push({...it,qty,min,cat:cat.nome});
     else if(qty===0) zerados.push({...it,qty,min,cat:cat.nome});
   }));
   const scM=document.getElementById('sc-missing');if(scM) scM.textContent=missing.length;
-  const scL=document.getElementById('sc-low');if(scL) scL.textContent=low.length;
   const scO=document.getElementById('sc-ok');if(scO) scO.textContent=ok.length;
   let html='';
   if(missing.length){
-    html+=`<div class="section-title red">🚨 Faltando</div><div class="alert-cards">`;
+    html+=`<div class="section-title red">🚨 Falta</div><div class="alert-cards">`;
     missing.forEach(it=>{html+=`<div class="alert-card missing"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
-    html+='</div>';
-  }
-  if(low.length){
-    html+=`<div class="section-title yellow">⚠️ Baixo</div><div class="alert-cards">`;
-    low.forEach(it=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${it.nome}</div><div class="alert-detail">mín ${it.min}</div></div><div class="alert-qty">${it.qty}</div></div>`;});
     html+='</div>';
   }
   if(zerados.length){
@@ -2077,7 +2069,7 @@ function exportCSVCervejas() {
     const d = weeks.length===1 ? cGetItemData(it.id,weeks[0]) : _EMPTY_LOCS();
     if(weeks.length>1) weeks.forEach(w=>{ const dd=cGetItemData(it.id,w); LOCAIS.forEach(l=>{ d[l.id]=(d[l.id]||0)+(dd[l.id]||0); }); });
     const min=cGetMin(it.id),st=itemStatus(total,min);
-    rows.push([it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—']);
+    rows.push([it.nome,cat.nome,total,d.estoque,d.piscina,d.gel_ext,d.bar,d.camara,min||'—',st==='missing'?'Falta':st==='ok'?'OK':'—']);
   }));
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download=`estoque-cervejas-${semLabel}.csv`;a.click();
@@ -2094,7 +2086,7 @@ function exportPDFCervejas() {
   const now = new Date().toLocaleString('pt-BR');
 
   // Calcular stocks
-  const missing=[],low=[],okList=[];
+  const missing=[],okList=[];
   let totalQty=0;
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
     const total=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
@@ -2104,21 +2096,19 @@ function exportPDFCervejas() {
     weeks.forEach(w=>{const dd=cGetItemData(it.id,w);LOCAIS.forEach(l=>{d[l.id]=(d[l.id]||0)+(dd[l.id]||0);});});
     const entry={nome:it.nome,cat:cat.nome,total,min,d};
     if(st==='missing') missing.push({...entry,falta:min-total});
-    else if(st==='low') low.push(entry);
     else if(st==='ok') okList.push(entry);
   }));
 
-  // Cabeçalho preto
-  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  // Cabeçalho
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO DE ESTOQUE — CERVEJAS', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   // Cards
   let y=34;
-  const cardW=(colW-8)/3;
-  [{label:'FALTANDO',num:missing.length,r:220,g:60,b:60},{label:'BAIXO',num:low.length,r:220,g:170,b:40},{label:'OK',num:okList.length,r:60,g:175,b:100}]
+  const cardW=(colW-4)/2;
+  [{label:'FALTA',num:missing.length,r:220,g:60,b:60},{label:'OK',num:okList.length,r:60,g:175,b:100}]
   .forEach((c,i)=>{
     const cx=margin+i*(cardW+4);
     doc.setFillColor(245,245,245); doc.setDrawColor(220,220,220);
@@ -2137,28 +2127,15 @@ function exportPDFCervejas() {
   }
   const locCols={3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'}};
 
-  // Faltando
+  // Falta
   if(missing.length){
-    sectionTitle('FALTANDO / ABAIXO DO MÍNIMO',210,60,60);
+    sectionTitle('FALTA / ABAIXO DO MÍNIMO',210,60,60);
     doc.autoTable({startY:y,
       head:[['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo','Falta']],
       body:missing.map(({nome,cat,total,min,d,falta})=>[nome,cat,String(total),String(d.estoque),String(d.piscina),String(d.gel_ext),String(d.bar),String(d.camara),String(min),String(falta)]),
       theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
       headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
       columnStyles:{2:{halign:'center'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'},9:{halign:'center',textColor:[210,60,60],fontStyle:'bold'}},
-      margin:{left:margin,right:margin}});
-    y=doc.lastAutoTable.finalY+5;
-  }
-
-  // Baixo
-  if(low.length){
-    sectionTitle('ESTOQUE BAIXO',190,140,30);
-    doc.autoTable({startY:y,
-      head:[['Cerveja','Categoria','Total','Estoque','Piscina','Gel.Ext','Bar','Câmara','Mínimo']],
-      body:low.map(({nome,cat,total,min,d})=>[nome,cat,String(total),String(d.estoque),String(d.piscina),String(d.gel_ext),String(d.bar),String(d.camara),String(min)]),
-      theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
-      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
-      columnStyles:{2:{halign:'center',textColor:[190,140,30],fontStyle:'bold'},3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center'},7:{halign:'center'},8:{halign:'center'}},
       margin:{left:margin,right:margin}});
     y=doc.lastAutoTable.finalY+5;
   }
@@ -2173,7 +2150,7 @@ function exportPDFCervejas() {
       const d=_EMPTY_LOCS();
       weeks.forEach(w=>{const dd=cGetItemData(it.id,w);LOCAIS.forEach(l=>{d[l.id]=(d[l.id]||0)+(dd[l.id]||0);});});
       const min=cGetMin(it.id),st=itemStatus(total,min);
-      const stL=st==='missing'?'FALTA':st==='low'?'BAIXO':st==='ok'?'OK':'—';
+      const stL=st==='missing'?'FALTA':st==='ok'?'OK':'—';
       body.push([it.nome,'',String(total),String(d.estoque),String(d.piscina),String(d.gel_ext),String(d.bar),String(d.camara),stL]);
     });
   });
@@ -2186,7 +2163,6 @@ function exportPDFCervejas() {
     didParseCell:(d)=>{
       if(d.section==='body'&&d.column.index===8){
         if(d.cell.raw==='FALTA'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
-        else if(d.cell.raw==='BAIXO'){d.cell.styles.textColor=[190,140,30];d.cell.styles.fontStyle='bold';}
         else if(d.cell.raw==='OK'){d.cell.styles.textColor=[60,160,90];}
       }
     },
@@ -2211,7 +2187,7 @@ function exportPDFCervejas() {
   showToast('PDF exportado ✓');
 }
 
-// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// Versão simplificada: lista TODOS os itens com contagem, mín. e status (falta/ok)
 // itens com a contagem, incluindo os zerados. Mesmo formato do "Simples" do
 // Analytics, só que restrito a esse app.
 function exportPDFCervejasSimples() {
@@ -2223,26 +2199,33 @@ function exportPDFCervejasSimples() {
   const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
   const now = new Date().toLocaleString('pt-BR');
 
-  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO SIMPLIFICADO — CERVEJAS', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   let y=34, totalQty=0;
   const body=[];
   CAT_CERVEJAS.forEach(cat=>{
-    body.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    body.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.itens.forEach(it=>{
       const qty=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
       totalQty+=qty;
-      body.push([it.nome,String(qty)]);
+      const min=cGetMin(it.id),st=itemStatus(qty,min);
+      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+      body.push([it.nome,String(qty),stL]);
     });
   });
-  doc.autoTable({startY:y,head:[['Cerveja','Qtd']],body,theme:'grid',
+  doc.autoTable({startY:y,head:[['Cerveja','Qtd','Status']],body,theme:'grid',
     styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
     headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
-    columnStyles:{1:{halign:'center'}},
+    columnStyles:{1:{halign:'center'},2:{halign:'center'}},
+    didParseCell:(d)=>{
+      if(d.section==='body'&&d.column.index===2){
+        if(d.cell.raw==='falta'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='ok'){d.cell.styles.textColor=[60,160,90];}
+      }
+    },
     margin:{left:margin,right:margin}});
   y=doc.lastAutoTable.finalY+5;
 
@@ -2376,8 +2359,7 @@ async function changeFoodCount(item,delta,row,display) {
 function updateFoodRowStatus(item,row,qty) {
   const min=aGetMin(item);
   row.classList.toggle('has-count',qty>0);
-  row.classList.toggle('is-low',qty>0&&qty>=min&&qty<=min*1.5&&min>0);
-  row.classList.toggle('is-missing',(qty<min&&min>0));
+  row.classList.toggle('is-missing',(qty<=min&&min>0));
   const b=document.getElementById('fb-'+encodeURIComponent(item));
   if(b) b.textContent=aGetMin(item)>0?`mín ${aGetMin(item)}`:'';
 }
@@ -2456,26 +2438,19 @@ function buildFoodResumo() {
   const weeks=foodResumoWeek===5?[0,1,2,3,4]:[foodResumoWeek];
   const agg={};weeks.forEach(w=>Object.entries(DB.alimentos.counts[w]).forEach(([item,val])=>{if(val>0) agg[item]=(agg[item]||0)+val;}));
   const allWithMin=[];CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{if(aGetMin(item)>0) allWithMin.push(item);}));
-  const missing=[],low=[];
+  const missing=[];
   allWithMin.forEach(item=>{
     const qty=agg[item]||0,min=aGetMin(item);
-    if(qty<min) missing.push({item,qty,min});
-    else if(qty<=min*1.5) low.push({item,qty,min});
+    if(qty<=min) missing.push({item,qty,min});
   });
-  const ok=allWithMin.filter(i=>{ const qty=agg[i]||0,min=aGetMin(i); return qty>=min&&qty>min*1.5; }).length;
-  let html=`<div class="status-cards">
-    <div class="status-card missing"><div class="sc-num">${missing.length}</div><div class="sc-label">Faltando</div></div>
-    <div class="status-card low"><div class="sc-num">${low.length}</div><div class="sc-label">Baixo</div></div>
+  const ok=allWithMin.filter(i=>{ const qty=agg[i]||0,min=aGetMin(i); return qty>min; }).length;
+  let html=`<div class="status-cards" style="grid-template-columns:repeat(2,1fr)">
+    <div class="status-card missing"><div class="sc-num">${missing.length}</div><div class="sc-label">Falta</div></div>
     <div class="status-card ok"><div class="sc-num">${ok}</div><div class="sc-label">OK</div></div>
   </div>`;
   if(missing.length){
-    html+=`<div class="section-title red">🚨 Faltando</div><div class="alert-cards">`;
+    html+=`<div class="section-title red">🚨 Falta</div><div class="alert-cards">`;
     missing.forEach(({item,qty,min})=>{html+=`<div class="alert-card missing"><div class="alert-info"><div class="alert-name">${item}</div><div class="alert-detail">mín ${min} · falta ${min-qty}</div></div><div class="alert-qty">${qty}</div></div>`;});
-    html+='</div>';
-  }
-  if(low.length){
-    html+=`<div class="section-title yellow">⚠️ Baixo</div><div class="alert-cards">`;
-    low.forEach(({item,qty,min})=>{html+=`<div class="alert-card low"><div class="alert-info"><div class="alert-name">${item}</div><div class="alert-detail">mín ${min}</div></div><div class="alert-qty">${qty}</div></div>`;});
     html+='</div>';
   }
   const hasData=Object.values(agg).some(v=>v>0);
@@ -2486,9 +2461,9 @@ function buildFoodResumo() {
       html+=`<div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 4px;border-bottom:1px solid var(--border);margin-bottom:6px">${cat.name}</div>`;
       counted.forEach(item=>{
         const qty=agg[item]||0,min=aGetMin(item),s=itemStatus(qty,min);
-        html+=`<div class="alert-card" style="border-left:3px solid ${s==='ok'?'var(--green)':s==='low'?'var(--yellow)':'var(--text-muted)'}">
+        html+=`<div class="alert-card" style="border-left:3px solid ${s==='ok'?'var(--green)':'var(--text-muted)'}">
           <div class="alert-info"><div class="alert-name">${item}</div></div>
-          <div class="alert-qty" style="color:${s==='ok'?'var(--green)':s==='low'?'var(--yellow)':'var(--text)'}">${qty}</div>
+          <div class="alert-qty" style="color:${s==='ok'?'var(--green)':'var(--text)'}">${qty}</div>
         </div>`;
       });
     });
@@ -2512,7 +2487,7 @@ function exportCSVAlimentos() {
   const rows=[['Item','Categoria','Qtd','Mínimo','Status']];
   CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
     const qty=agg[item]||0,min=aGetMin(item),st=itemStatus(qty,min);
-    if(qty>0||min>0) rows.push([item,cat.name,qty,min,st==='missing'?'Faltando':st==='low'?'Baixo':st==='ok'?'OK':'—']);
+    if(qty>0||min>0) rows.push([item,cat.name,qty,min,st==='missing'?'Falta':st==='ok'?'OK':'—']);
   }));
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));a.download='estoque-alimentos.csv';a.click();
@@ -2534,31 +2509,27 @@ function exportPDFAlimentos() {
   weeks.forEach(w => Object.entries(DB.alimentos.counts[w]).forEach(([item,val]) => { if(val>0) agg[item]=(agg[item]||0)+val; }));
   const allWithMin = [];
   CAT_ALIMENTOS.forEach(cat => cat.items.forEach(item => { if(aGetMin(item)>0) allWithMin.push(item); }));
-  const missing = [], low = [], okList = [];
+  const missing = [], okList = [];
   allWithMin.forEach(item => {
     const qty=agg[item]||0, min=aGetMin(item);
-    if(qty<min) missing.push({item,qty,min,falta:min-qty});
-    else if(qty<=min*1.5) low.push({item,qty,min});
+    if(qty<=min) missing.push({item,qty,min,falta:min-qty});
     else okList.push({item,qty,min});
   });
   const totalQty = Object.values(agg).reduce((s,v)=>s+v,0);
   const now = new Date().toLocaleString('pt-BR');
 
   // ── CABEÇALHO ──────────────────────────────────────────────────
-  doc.setFillColor(15,14,13);
-  doc.rect(0, 0, pageW, 28, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO DE ESTOQUE', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   // ── CARDS RESUMO ───────────────────────────────────────────────
   let y = 34;
-  const cardW = (colW - 8) / 3;
+  const cardW = (colW - 4) / 2;
   const cards = [
-    { label:'FALTANDO', num: missing.length, r:220, g:60,  b:60  },
-    { label:'BAIXO',    num: low.length,     r:220, g:170, b:40  },
-    { label:'OK',       num: okList.length,  r:60,  g:175, b:100 },
+    { label:'FALTA', num: missing.length, r:220, g:60,  b:60  },
+    { label:'OK',    num: okList.length,  r:60,  g:175, b:100 },
   ];
   cards.forEach((c, i) => {
     const cx = margin + i*(cardW+4);
@@ -2580,9 +2551,9 @@ function exportPDFAlimentos() {
     y += 9;
   }
 
-  // ── FALTANDO ───────────────────────────────────────────────────
+  // ── FALTA ───────────────────────────────────────────────────
   if (missing.length) {
-    sectionTitle('FALTANDO / ABAIXO DO MINIMO', 210, 60, 60);
+    sectionTitle('FALTA / ABAIXO DO MINIMO', 210, 60, 60);
     doc.autoTable({
       startY: y,
       head: [['Item','Qtd em estoque','Mínimo','Falta']],
@@ -2591,22 +2562,6 @@ function exportPDFAlimentos() {
       styles: { fontSize:8, cellPadding:2, textColor:[30,30,30], lineColor:[200,200,200], fillColor:[255,255,255] },
       headStyles: { fillColor:[240,240,240], textColor:[80,80,80], fontSize:7.5, fontStyle:'bold' },
       columnStyles: { 1:{halign:'center'}, 2:{halign:'center'}, 3:{halign:'center',textColor:[210,60,60],fontStyle:'bold'} },
-      margin: { left:margin, right:margin },
-    });
-    y = doc.lastAutoTable.finalY + 5;
-  }
-
-  // ── BAIXO ──────────────────────────────────────────────────────
-  if (low.length) {
-    sectionTitle('ESTOQUE BAIXO', 190, 140, 30);
-    doc.autoTable({
-      startY: y,
-      head: [['Item','Qtd em estoque','Mínimo']],
-      body: low.map(({item,qty,min}) => [item, String(qty), String(min)]),
-      theme: 'grid',
-      styles: { fontSize:8, cellPadding:2, textColor:[30,30,30], lineColor:[200,200,200], fillColor:[255,255,255] },
-      headStyles: { fillColor:[240,240,240], textColor:[80,80,80], fontSize:7.5, fontStyle:'bold' },
-      columnStyles: { 1:{halign:'center',textColor:[190,140,30],fontStyle:'bold'}, 2:{halign:'center'} },
       margin: { left:margin, right:margin },
     });
     y = doc.lastAutoTable.finalY + 5;
@@ -2629,7 +2584,7 @@ function exportPDFAlimentos() {
       rowIdx++;
       counted.forEach(item => {
         const qty=agg[item]||0, min=aGetMin(item), st=itemStatus(qty,min);
-        const stLabel = st==='missing'?'FALTA':st==='low'?'BAIXO':st==='ok'?'OK':'—';
+        const stLabel = st==='missing'?'FALTA':st==='ok'?'OK':'—';
         body.push([item, String(qty), stLabel]);
         rowIdx++;
       });
@@ -2645,7 +2600,6 @@ function exportPDFAlimentos() {
       didParseCell: (d) => {
         if(d.section==='body' && d.column.index===2) {
           if(d.cell.raw==='FALTA'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
-          else if(d.cell.raw==='BAIXO'){d.cell.styles.textColor=[190,140,30];d.cell.styles.fontStyle='bold';}
           else if(d.cell.raw==='OK'){d.cell.styles.textColor=[60,160,90];}
         }
       },
@@ -2676,7 +2630,7 @@ function exportPDFAlimentos() {
   showToast('PDF exportado ✓');
 }
 
-// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// Versão simplificada: lista TODOS os itens com contagem, mín. e status (falta/ok)
 // itens com a contagem, incluindo os zerados. Mesmo formato do "Simples" do
 // Analytics, só que restrito a esse app.
 function exportPDFAlimentosSimples() {
@@ -2690,22 +2644,31 @@ function exportPDFAlimentosSimples() {
   weeks.forEach(w => Object.entries(DB.alimentos.counts[w]).forEach(([item,val]) => { if(val>0) agg[item]=(agg[item]||0)+val; }));
   const now = new Date().toLocaleString('pt-BR');
 
-  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO SIMPLIFICADO — ALIMENTOS', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   let y=34;
   const body=[];
   CAT_ALIMENTOS.forEach(cat=>{
-    body.push([{content:cat.name,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
-    cat.items.forEach(item=>{ body.push([item,String(agg[item]||0)]); });
+    body.push([{content:cat.name,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cat.items.forEach(item=>{
+      const qty=agg[item]||0,min=aGetMin(item),st=itemStatus(qty,min);
+      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+      body.push([item,String(qty),stL]);
+    });
   });
-  doc.autoTable({startY:y,head:[['Item','Qtd']],body,theme:'grid',
+  doc.autoTable({startY:y,head:[['Item','Qtd','Status']],body,theme:'grid',
     styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
     headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
-    columnStyles:{1:{halign:'center'}},
+    columnStyles:{1:{halign:'center'},2:{halign:'center'}},
+    didParseCell:(d)=>{
+      if(d.section==='body'&&d.column.index===2){
+        if(d.cell.raw==='falta'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='ok'){d.cell.styles.textColor=[60,160,90];}
+      }
+    },
     margin:{left:margin,right:margin}});
   y=doc.lastAutoTable.finalY+5;
 
@@ -2811,55 +2774,45 @@ function buildAnalyticsBody() {
     aStock[item]=0; weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
   }));
 
-  const bMissing=[],bLow=[],bOk=[];
+  const bMissing=[],bOk=[];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') bMissing.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
-    else if(st==='low') bLow.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
     else if(st==='ok') bOk.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
   }));
-  const cMissing=[],cLow=[],cOk=[];
+  const cMissing=[],cOk=[];
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') cMissing.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
-    else if(st==='low') cLow.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
     else if(st==='ok') cOk.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
   }));
-  const aMissing=[],aLow=[],aOk=[];
+  const aMissing=[],aOk=[];
   CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
     const min=aGetMin(item);
     if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
     const qty=aStock[item],st=itemStatus(qty,min);
     if(st==='missing') aMissing.push({nome:item,qty,min,src:'🍔 Alimentos'});
-    else if(st==='low') aLow.push({nome:item,qty,min,src:'🍔 Alimentos'});
     else if(st==='ok') aOk.push({nome:item,qty,min,src:'🍔 Alimentos'});
   }));
 
   const allMissing=[...bMissing,...cMissing,...aMissing];
-  const allLow=[...bLow,...cLow,...aLow];
   const allOk=[...bOk,...cOk,...aOk];
-  const total=allMissing.length+allLow.length+allOk.length;
+  const total=allMissing.length+allOk.length;
 
   let html=`
-  <div class="analytics-grid">
-    <div class="an-card danger"><div class="an-num">${allMissing.length}</div><div class="an-label">Faltando</div></div>
-    <div class="an-card warning"><div class="an-num">${allLow.length}</div><div class="an-label">Baixo</div></div>
+  <div class="analytics-grid" style="grid-template-columns:repeat(2,1fr)">
+    <div class="an-card danger"><div class="an-num">${allMissing.length}</div><div class="an-label">Falta</div></div>
     <div class="an-card success"><div class="an-num">${allOk.length}</div><div class="an-label">OK</div></div>
   </div>
   <div class="analytics-grid" style="margin-bottom:18px">
-    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🥤</div><div class="an-sub">B: ${bMissing.length}⚠ ${bLow.length}⬇ ${bOk.length}✓</div><div class="an-label">Bebidas</div></div>
-    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍺</div><div class="an-sub">B: ${cMissing.length}⚠ ${cLow.length}⬇ ${cOk.length}✓</div><div class="an-label">Cervejas</div></div>
-    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍔</div><div class="an-sub">B: ${aMissing.length}⚠ ${aLow.length}⬇ ${aOk.length}✓</div><div class="an-label">Alimentos</div></div>
+    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🥤</div><div class="an-sub">B: ${bMissing.length}⚠ ${bOk.length}✓</div><div class="an-label">Bebidas</div></div>
+    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍺</div><div class="an-sub">B: ${cMissing.length}⚠ ${cOk.length}✓</div><div class="an-label">Cervejas</div></div>
+    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍔</div><div class="an-sub">B: ${aMissing.length}⚠ ${aOk.length}✓</div><div class="an-label">Alimentos</div></div>
   </div>`;
 
   if(allMissing.length){
-    html+=`<div class="an-section"><div class="an-section-title red">🚨 Faltando — ${allMissing.length} iten${allMissing.length!==1?'s':''}</div>`;
+    html+=`<div class="an-section"><div class="an-section-title red">🚨 Falta — ${allMissing.length} iten${allMissing.length!==1?'s':''}</div>`;
     allMissing.forEach(it=>{html+=`<div class="an-item-row danger"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">${it.src} · mín ${it.min}</div></div><div class="an-item-qty">${it.qty}</div></div>`;});
-    html+='</div>';
-  }
-  if(allLow.length){
-    html+=`<div class="an-section"><div class="an-section-title yellow">⚠️ Estoque Baixo — ${allLow.length} iten${allLow.length!==1?'s':''}</div>`;
-    allLow.forEach(it=>{html+=`<div class="an-item-row warning"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">${it.src} · mín ${it.min}</div></div><div class="an-item-qty">${it.qty}</div></div>`;});
     html+='</div>';
   }
   if(allOk.length){
@@ -2898,17 +2851,15 @@ function exportPDFAnalytics() {
   const aStock={};
   CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{aStock[item]=0;weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});}));
 
-  const allMissing=[],allLow=[],allOk=[];
+  const allMissing=[],allOk=[];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Bebidas'});
-    else if(st==='low') allLow.push({nome:it.nome,qty,min,src:'Bebidas'});
     else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Bebidas'});
   }));
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Cervejas'});
-    else if(st==='low') allLow.push({nome:it.nome,qty,min,src:'Cervejas'});
     else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Cervejas'});
   }));
   CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
@@ -2916,21 +2867,19 @@ function exportPDFAnalytics() {
     if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
     const qty=aStock[item],st=itemStatus(qty,min);
     if(st==='missing') allMissing.push({nome:item,qty,min,falta:min-qty,src:'Alimentos'});
-    else if(st==='low') allLow.push({nome:item,qty,min,src:'Alimentos'});
     else if(st==='ok') allOk.push({nome:item,qty,min,src:'Alimentos'});
   }));
 
-  // Cabeçalho preto
-  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  // Cabeçalho
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO ANALYTICS — GERAL', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   // Cards
   let y=34;
-  const cardW=(colW-8)/3;
-  [{label:'FALTANDO',num:allMissing.length,r:220,g:60,b:60},{label:'BAIXO',num:allLow.length,r:220,g:170,b:40},{label:'OK',num:allOk.length,r:60,g:175,b:100}]
+  const cardW=(colW-4)/2;
+  [{label:'FALTA',num:allMissing.length,r:220,g:60,b:60},{label:'OK',num:allOk.length,r:60,g:175,b:100}]
   .forEach((c,i)=>{
     const cx=margin+i*(cardW+4);
     doc.setFillColor(245,245,245); doc.setDrawColor(220,220,220);
@@ -2949,25 +2898,13 @@ function exportPDFAnalytics() {
   }
 
   if(allMissing.length){
-    sectionTitle('FALTANDO / ABAIXO DO MÍNIMO',210,60,60);
+    sectionTitle('FALTA / ABAIXO DO MÍNIMO',210,60,60);
     doc.autoTable({startY:y,
       head:[['Item','Origem','Qtd','Mínimo','Falta']],
       body:allMissing.map(({nome,src,qty,min,falta})=>[nome,src,String(qty),String(min),String(falta)]),
       theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
       headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
       columnStyles:{2:{halign:'center'},3:{halign:'center'},4:{halign:'center',textColor:[210,60,60],fontStyle:'bold'}},
-      margin:{left:margin,right:margin}});
-    y=doc.lastAutoTable.finalY+5;
-  }
-
-  if(allLow.length){
-    sectionTitle('ESTOQUE BAIXO',190,140,30);
-    doc.autoTable({startY:y,
-      head:[['Item','Origem','Qtd','Mínimo']],
-      body:allLow.map(({nome,src,qty,min})=>[nome,src,String(qty),String(min)]),
-      theme:'grid',styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
-      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
-      columnStyles:{2:{halign:'center',textColor:[190,140,30],fontStyle:'bold'},3:{halign:'center'}},
       margin:{left:margin,right:margin}});
     y=doc.lastAutoTable.finalY+5;
   }
@@ -3002,7 +2939,7 @@ function exportPDFAnalytics() {
   showToast('PDF exportado ✓');
 }
 
-// Versão simplificada: sem classificar por Faltando/Baixo/OK — lista TODOS os
+// Versão simplificada: lista TODOS os itens com contagem, mín. e status (falta/ok)
 // itens de todos os apps com a contagem, incluindo os que estão zerados. Útil
 // pra conferência rápida ("bateu tudo?") em vez de análise de status.
 function exportPDFAnalyticsSimples() {
@@ -3015,10 +2952,9 @@ function exportPDFAnalyticsSimples() {
   const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
   const now = new Date().toLocaleString('pt-BR');
 
-  doc.setFillColor(15,14,13); doc.rect(0,0,pageW,28,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
   doc.text('RELATÓRIO SIMPLIFICADO — TODAS AS CONTAGENS', margin, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,175,168);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
   let y=34;
@@ -3029,10 +2965,16 @@ function exportPDFAnalyticsSimples() {
     doc.text(title,margin+3,y+4.8); y+=9;
   }
   function itemsTable(body){
-    doc.autoTable({startY:y,head:[['Item','Qtd']],body,theme:'grid',
+    doc.autoTable({startY:y,head:[['Item','Qtd','Status']],body,theme:'grid',
       styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
       headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
-      columnStyles:{1:{halign:'center'}},
+      columnStyles:{1:{halign:'center'},2:{halign:'center'}},
+      didParseCell:(d)=>{
+        if(d.section==='body'&&d.column.index===2){
+          if(d.cell.raw==='falta'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+          else if(d.cell.raw==='ok'){d.cell.styles.textColor=[60,160,90];}
+        }
+      },
       margin:{left:margin,right:margin}});
     y=doc.lastAutoTable.finalY+8;
   }
@@ -3040,10 +2982,12 @@ function exportPDFAnalyticsSimples() {
   sectionTitle('🥤 BEBIDAS — TODOS OS ITENS');
   const bBody=[];
   CAT_BEBIDAS.forEach(cat=>{
-    bBody.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    bBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.itens.forEach(it=>{
       let qty=0; weeks_n.forEach(w=>{qty+=bGetTotal(it.id,w);});
-      bBody.push([it.nome,String(qty)]);
+      const min=bGetMin(it.id),st=itemStatus(qty,min);
+      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+      bBody.push([it.nome,String(qty),stL]);
     });
   });
   itemsTable(bBody);
@@ -3051,10 +2995,12 @@ function exportPDFAnalyticsSimples() {
   sectionTitle('🍺 CERVEJAS — TODOS OS ITENS');
   const cBody=[];
   CAT_CERVEJAS.forEach(cat=>{
-    cBody.push([{content:cat.nome,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    cBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.itens.forEach(it=>{
       let qty=0; weeks_n.forEach(w=>{qty+=cGetTotal(it.id,w);});
-      cBody.push([it.nome,String(qty)]);
+      const min=cGetMin(it.id),st=itemStatus(qty,min);
+      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+      cBody.push([it.nome,String(qty),stL]);
     });
   });
   itemsTable(cBody);
@@ -3062,10 +3008,12 @@ function exportPDFAnalyticsSimples() {
   sectionTitle('🍔 ALIMENTOS — TODOS OS ITENS');
   const aBody=[];
   CAT_ALIMENTOS.forEach(cat=>{
-    aBody.push([{content:cat.name,colSpan:2,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+    aBody.push([{content:cat.name,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.items.forEach(item=>{
       let qty=0; weeks_a.forEach(w=>{qty+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
-      aBody.push([item,String(qty)]);
+      const min=aGetMin(item),st=itemStatus(qty,min);
+      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+      aBody.push([item,String(qty),stL]);
     });
   });
   itemsTable(aBody);
@@ -3159,7 +3107,7 @@ async function confirmAdj() {
 function refreshCardCerveja(id) {
   const total=cGetTotal(id,currentWeek),min=cGetMin(id),st=itemStatus(total,min);
   const card=document.getElementById(`card-${id}`);if(!card) return;
-  card.className=`item-card-beer ${st==='missing'?'critical':st==='low'?'low':total>0?'has-qty':''}`;
+  card.className=`item-card-beer ${st==='missing'?'critical':total>0?'has-qty':''}`;
   const qd=document.getElementById(`qty-${id}`);if(qd){qd.textContent=total;qd.className=`qty-display-beer${total===0?' zero':''}`;}
   LOCAIS.forEach(loc=>{
     const lq=(cGetItemData(id,currentWeek)[loc.id]||0);
