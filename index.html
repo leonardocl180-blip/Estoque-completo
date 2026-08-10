@@ -520,6 +520,7 @@ header {
 .an-item-row.warning .an-item-qty { color: var(--yellow); }
 .an-week-bar { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .an-week-bar::-webkit-scrollbar { display: none; }
+.an-group-bar { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
 
 .config-content { padding: 14px 16px 80px; }
 .config-top { margin-bottom: 10px; }
@@ -573,7 +574,15 @@ header {
 .cfg-add-btn { padding:8px 14px; background:var(--amber); border:none; color:#000; font-weight:700; border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; white-space:nowrap; }
 .cfg-add-btn:active { opacity:0.8; }
 .cfg-section-block { margin-bottom:22px; }
-.cfg-section-header { font-family:'Bebas Neue',cursive; font-size:15px; color:var(--amber); letter-spacing:1px; padding:10px 0 6px; border-bottom:1px solid var(--border); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+.cfg-section-header { padding:10px 0 6px; border-bottom:1px solid var(--border); margin-bottom:8px; display:flex; flex-direction:column; gap:5px; }
+.cfg-section-header-top { font-family:'Bebas Neue',cursive; font-size:15px; color:var(--amber); letter-spacing:1px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.cfg-cat-name { cursor:pointer; }
+.cfg-cat-name:active { opacity:0.7; }
+.cfg-cat-distrib { font-family:'DM Sans',sans-serif; font-size:11px; color:var(--text-muted); cursor:pointer; }
+.cfg-cat-distrib-empty { color:var(--amber); opacity:0.85; font-style:italic; }
+.cfg-move-wrap { display:flex; align-items:center; flex-shrink:0; }
+.cfg-move-btn { background:var(--surface3); border:none; color:var(--blue); border-radius:5px; width:26px; height:26px; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.cfg-move-select { min-width:112px; max-width:140px; background:var(--surface3); border:1px solid var(--blue); border-radius:4px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:11px; padding:4px; outline:none; }
 .cfg-new-cat-row { display:flex; gap:6px; margin-bottom:10px; }
 .cfg-tabs-wrap { padding:10px 16px 80px; }
 .cfg-page { display:none; }
@@ -1376,23 +1385,23 @@ function itemStatus(qty, min) {
 // DADOS
 // ═══════════════════════════════════════════════════════════════════════════════
 const CAT_BEBIDAS = [
-  { nome:"Coca-Cola & Pepsi", itens:[{id:23,nome:"Coca-Cola"},{id:24,nome:"Coca-Cola Zero"},{id:1721,nome:"Coca-Cola 2 Litros"},{id:3141,nome:"Coca-Cola Zero 2L"},{id:29,nome:"Pepsi"},{id:30,nome:"Pepsi Black"}]},
-  { nome:"Fanta & Sprite", itens:[{id:25,nome:"Fanta Laranja"},{id:26,nome:"Fanta Uva"},{id:3259,nome:"Fanta Laranja Zero"},{id:28,nome:"Sprite"},{id:3260,nome:"Sprite Zero"}]},
-  { nome:"Guaraná", itens:[{id:32,nome:"Guaraná"},{id:33,nome:"Guaraná Zero"},{id:34,nome:"Guaraná 2 Litros"},{id:56,nome:"Guaraná Açaí"},{id:57,nome:"Guaraná Power"}]},
-  { nome:"Schweppes & Tônica", itens:[{id:27,nome:"Schweppes"},{id:3942,nome:"Schweppes Tônica"},{id:35,nome:"Fys Tônica"},{id:37,nome:"Fys Limão Siciliano"},{id:3945,nome:"Tônica Antarctica"}]},
-  { nome:"Sucos & Del Valle", itens:[{id:44,nome:"Del Valle Uva"},{id:45,nome:"Del Valle Pêssego"},{id:46,nome:"Del Valle Maracujá"},{id:3360,nome:"Suco Laranja Mitz"},{id:33601,nome:"Suco Uva Mitz"},{id:2058,nome:"Matte Leão"},{id:2059,nome:"Matte Leão Limão"}]},
-  { nome:"Água & H2O", itens:[{id:63,nome:"H2O"},{id:64,nome:"H2O Limoneto"},{id:59,nome:"Água de Coco"}]},
-  { nome:"Isotônicos — Gatorade", itens:[{id:1649,nome:"Gatorade Uva"},{id:1650,nome:"Gatorade Laranja"},{id:1651,nome:"Gatorade Tangerina"},{id:1652,nome:"Gatorade Limão"},{id:3719,nome:"Gatorade Blueberry"},{id:3859,nome:"Gatorade Morango"}]},
-  { nome:"Isotônicos — Powerade", itens:[{id:3887,nome:"Powerade Mix Frutas"},{id:3894,nome:"Powerade Uva"},{id:3925,nome:"Powerade Laranja"},{id:3926,nome:"Powerade Limão"},{id:3927,nome:"Powerade Frutas Tropicais"},{id:3932,nome:"Powerade Tangerina"},{id:3934,nome:"Powerade Mint Blast"}]},
-  { nome:"Energéticos", itens:[{id:71,nome:"Monster"},{id:3933,nome:"Monster Zero"}]},
-  { nome:"Legger", itens:[{id:3189,nome:"Legger Citrus"},{id:3404,nome:"Legger Açaí"},{id:3405,nome:"Legger Limão"},{id:3406,nome:"Legger Guaraná"}]},
-  { nome:"Cini", itens:[{id:3533,nome:"Cini Framboesa 2L"},{id:3534,nome:"Cini Laranjinha 2L"},{id:3911,nome:"Cini Guaraná 2L"},{id:2540,nome:"Cini Framboesa 500ml"},{id:3541,nome:"Cini Abacaxi 500ml"},{id:3542,nome:"Cini Gengibirra 500ml"},{id:3543,nome:"Cini Matte Pêssego"},{id:3544,nome:"Cini Matte Limão"},{id:3936,nome:"Cini Framboesa Lata"}]},
-  { nome:"Gasosas & Outros", itens:[{id:38,nome:"Itubaina"},{id:58,nome:"Chocomilk"},{id:3538,nome:"Gasosa Framboesa 600ml"},{id:3539,nome:"Gasosa Abacaxi 600ml"}]},
+  { nome:"Coca-Cola & Pepsi", distribuidora:"", itens:[{id:23,nome:"Coca-Cola"},{id:24,nome:"Coca-Cola Zero"},{id:1721,nome:"Coca-Cola 2 Litros"},{id:3141,nome:"Coca-Cola Zero 2L"},{id:29,nome:"Pepsi"},{id:30,nome:"Pepsi Black"}]},
+  { nome:"Fanta & Sprite", distribuidora:"", itens:[{id:25,nome:"Fanta Laranja"},{id:26,nome:"Fanta Uva"},{id:3259,nome:"Fanta Laranja Zero"},{id:28,nome:"Sprite"},{id:3260,nome:"Sprite Zero"}]},
+  { nome:"Guaraná", distribuidora:"", itens:[{id:32,nome:"Guaraná"},{id:33,nome:"Guaraná Zero"},{id:34,nome:"Guaraná 2 Litros"},{id:56,nome:"Guaraná Açaí"},{id:57,nome:"Guaraná Power"}]},
+  { nome:"Schweppes & Tônica", distribuidora:"", itens:[{id:27,nome:"Schweppes"},{id:3942,nome:"Schweppes Tônica"},{id:35,nome:"Fys Tônica"},{id:37,nome:"Fys Limão Siciliano"},{id:3945,nome:"Tônica Antarctica"}]},
+  { nome:"Sucos & Del Valle", distribuidora:"", itens:[{id:44,nome:"Del Valle Uva"},{id:45,nome:"Del Valle Pêssego"},{id:46,nome:"Del Valle Maracujá"},{id:3360,nome:"Suco Laranja Mitz"},{id:33601,nome:"Suco Uva Mitz"},{id:2058,nome:"Matte Leão"},{id:2059,nome:"Matte Leão Limão"}]},
+  { nome:"Água & H2O", distribuidora:"", itens:[{id:63,nome:"H2O"},{id:64,nome:"H2O Limoneto"},{id:59,nome:"Água de Coco"}]},
+  { nome:"Isotônicos — Gatorade", distribuidora:"", itens:[{id:1649,nome:"Gatorade Uva"},{id:1650,nome:"Gatorade Laranja"},{id:1651,nome:"Gatorade Tangerina"},{id:1652,nome:"Gatorade Limão"},{id:3719,nome:"Gatorade Blueberry"},{id:3859,nome:"Gatorade Morango"}]},
+  { nome:"Isotônicos — Powerade", distribuidora:"", itens:[{id:3887,nome:"Powerade Mix Frutas"},{id:3894,nome:"Powerade Uva"},{id:3925,nome:"Powerade Laranja"},{id:3926,nome:"Powerade Limão"},{id:3927,nome:"Powerade Frutas Tropicais"},{id:3932,nome:"Powerade Tangerina"},{id:3934,nome:"Powerade Mint Blast"}]},
+  { nome:"Energéticos", distribuidora:"", itens:[{id:71,nome:"Monster"},{id:3933,nome:"Monster Zero"}]},
+  { nome:"Legger", distribuidora:"", itens:[{id:3189,nome:"Legger Citrus"},{id:3404,nome:"Legger Açaí"},{id:3405,nome:"Legger Limão"},{id:3406,nome:"Legger Guaraná"}]},
+  { nome:"Cini", distribuidora:"", itens:[{id:3533,nome:"Cini Framboesa 2L"},{id:3534,nome:"Cini Laranjinha 2L"},{id:3911,nome:"Cini Guaraná 2L"},{id:2540,nome:"Cini Framboesa 500ml"},{id:3541,nome:"Cini Abacaxi 500ml"},{id:3542,nome:"Cini Gengibirra 500ml"},{id:3543,nome:"Cini Matte Pêssego"},{id:3544,nome:"Cini Matte Limão"},{id:3936,nome:"Cini Framboesa Lata"}]},
+  { nome:"Gasosas & Outros", distribuidora:"", itens:[{id:38,nome:"Itubaina"},{id:58,nome:"Chocomilk"},{id:3538,nome:"Gasosa Framboesa 600ml"},{id:3539,nome:"Gasosa Abacaxi 600ml"}]},
 ];
 
 const CAT_CERVEJAS = [
-  { nome:"Nacionais", itens:[{id:'antarctica',nome:'Antarctica'},{id:'original',nome:'Original'}]},
-  { nome:"Premium & Imports", itens:[{id:'heineken',nome:'Heineken'},{id:'amstel',nome:'Amstel'},{id:'stella',nome:'Stella Artois'},{id:'eisenbahn',nome:'Eisenbahn'}]},
+  { nome:"Nacionais", distribuidora:"", itens:[{id:'antarctica',nome:'Antarctica'},{id:'original',nome:'Original'}]},
+  { nome:"Premium & Imports", distribuidora:"", itens:[{id:'heineken',nome:'Heineken'},{id:'amstel',nome:'Amstel'},{id:'stella',nome:'Stella Artois'},{id:'eisenbahn',nome:'Eisenbahn'}]},
 ];
 
 const CAT_ALIMENTOS = [
@@ -2724,25 +2733,37 @@ async function changeFoodMin(item,delta,el) {
 // APP: ANALYTICS
 // ═══════════════════════════════════════════════════════════════════════════════
 let anWeek = 'all';
+let anGroup = 'drinks'; // 'drinks' (Bebidas+Cervejas) ou 'alimentos'
 
 function renderAnalytics() {
   document.getElementById('appContent').innerHTML = `
     <div class="main no-weekbar">
       <div class="analytics-wrap">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <div class="analytics-title">📊 Analytics Geral</div>
-          <div style="display:flex;gap:6px">
-            <button class="action-btn" style="flex:none;padding:7px 10px" onclick="exportPDFAnalytics()">📄 PDF</button>
-            <button class="action-btn" style="flex:none;padding:7px 10px" onclick="exportPDFAnalyticsSimples()">📋 Simples</button>
-          </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px">
+          <div class="analytics-title" id="anTitle">📊 Analytics</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="anPdfBtns"></div>
         </div>
-        <div class="analytics-sub">Resumo consolidado de todos os estoques</div>
+        <div class="analytics-sub" id="anSub">Resumo consolidado dos estoques</div>
+        <div class="an-group-bar" id="anGroupBar"></div>
         <div class="an-week-bar" id="anWeekBar"></div>
         <div id="analyticsBody"></div>
       </div>
     </div>`;
+  buildAnGroupBar();
   buildAnWeekBar();
   buildAnalyticsBody();
+}
+
+function buildAnGroupBar() {
+  const gb=document.getElementById('anGroupBar');if(!gb) return;
+  gb.innerHTML='';
+  [['drinks','🥤🍺 Bebidas & Cervejas'],['alimentos','🍔 Alimentos']].forEach(([val,lbl])=>{
+    const btn=document.createElement('button');
+    btn.className=`week-btn${anGroup===val?' active':''}`;
+    btn.textContent=lbl;
+    btn.onclick=()=>{anGroup=val;buildAnGroupBar();buildAnalyticsBody();};
+    gb.appendChild(btn);
+  });
 }
 
 function buildAnWeekBar() {
@@ -2761,54 +2782,75 @@ function buildAnalyticsBody() {
   const weeks_n = anWeek==='all'?[1,2,3,4,5]:[anWeek];
   const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
 
-  const bStock={};
-  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
-    bStock[it.id]=0; weeks_n.forEach(w=>{bStock[it.id]+=bGetTotal(it.id,w);});
-  }));
-  const cStock={};
-  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
-    cStock[it.id]=0; weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});
-  }));
-  const aStock={};
-  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
-    aStock[item]=0; weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
-  }));
+  const titleEl=document.getElementById('anTitle');
+  const subEl=document.getElementById('anSub');
+  const pdfBtns=document.getElementById('anPdfBtns');
+  if(titleEl) titleEl.textContent = anGroup==='drinks' ? '📊 Bebidas & Cervejas' : '📊 Alimentos';
+  if(subEl) subEl.textContent = anGroup==='drinks' ? 'Resumo consolidado de Bebidas e Cervejas' : 'Resumo consolidado de Alimentos';
+  if(pdfBtns){
+    pdfBtns.innerHTML = `
+      <button class="action-btn" style="flex:none;padding:7px 10px" onclick="exportPDFAnalytics()">📄 PDF</button>
+      <button class="action-btn" style="flex:none;padding:7px 10px" onclick="exportPDFAnalyticsSimples()">📋 Simples</button>
+      ${anGroup==='drinks' ? `<button class="action-btn" style="flex:none;padding:7px 10px" onclick="exportPDFDistribuidora()">🚚 Distrib.</button>` : ''}`;
+  }
 
-  const bMissing=[],bOk=[];
-  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
-    const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
-    if(st==='missing') bMissing.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
-    else if(st==='ok') bOk.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
-  }));
-  const cMissing=[],cOk=[];
-  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
-    const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
-    if(st==='missing') cMissing.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
-    else if(st==='ok') cOk.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
-  }));
-  const aMissing=[],aOk=[];
-  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
-    const min=aGetMin(item);
-    if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
-    const qty=aStock[item],st=itemStatus(qty,min);
-    if(st==='missing') aMissing.push({nome:item,qty,min,src:'🍔 Alimentos'});
-    else if(st==='ok') aOk.push({nome:item,qty,min,src:'🍔 Alimentos'});
-  }));
+  let bMissing=[],bOk=[],cMissing=[],cOk=[],aMissing=[],aOk=[];
 
-  const allMissing=[...bMissing,...cMissing,...aMissing];
-  const allOk=[...bOk,...cOk,...aOk];
+  if(anGroup==='drinks'){
+    const bStock={};
+    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+      bStock[it.id]=0; weeks_n.forEach(w=>{bStock[it.id]+=bGetTotal(it.id,w);});
+    }));
+    const cStock={};
+    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+      cStock[it.id]=0; weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});
+    }));
+    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+      const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
+      if(st==='missing') bMissing.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
+      else if(st==='ok') bOk.push({nome:it.nome,qty,min,src:'🥤 Bebidas'});
+    }));
+    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+      const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
+      if(st==='missing') cMissing.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
+      else if(st==='ok') cOk.push({nome:it.nome,qty,min,src:'🍺 Cervejas'});
+    }));
+  } else {
+    const aStock={};
+    CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+      aStock[item]=0; weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
+    }));
+    CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+      const min=aGetMin(item);
+      if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
+      const qty=aStock[item],st=itemStatus(qty,min);
+      if(st==='missing') aMissing.push({nome:item,qty,min,src:'🍔 Alimentos'});
+      else if(st==='ok') aOk.push({nome:item,qty,min,src:'🍔 Alimentos'});
+    }));
+  }
+
+  const allMissing = anGroup==='drinks' ? [...bMissing,...cMissing] : [...aMissing];
+  const allOk = anGroup==='drinks' ? [...bOk,...cOk] : [...aOk];
   const total=allMissing.length+allOk.length;
 
   let html=`
   <div class="analytics-grid" style="grid-template-columns:repeat(2,1fr)">
     <div class="an-card danger"><div class="an-num">${allMissing.length}</div><div class="an-label">Falta</div></div>
     <div class="an-card success"><div class="an-num">${allOk.length}</div><div class="an-label">OK</div></div>
-  </div>
-  <div class="analytics-grid" style="margin-bottom:18px">
-    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🥤</div><div class="an-sub">B: ${bMissing.length}⚠ ${bOk.length}✓</div><div class="an-label">Bebidas</div></div>
-    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍺</div><div class="an-sub">B: ${cMissing.length}⚠ ${cOk.length}✓</div><div class="an-label">Cervejas</div></div>
-    <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍔</div><div class="an-sub">B: ${aMissing.length}⚠ ${aOk.length}✓</div><div class="an-label">Alimentos</div></div>
   </div>`;
+
+  if(anGroup==='drinks'){
+    html+=`
+    <div class="analytics-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:18px">
+      <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🥤</div><div class="an-sub">B: ${bMissing.length}⚠ ${bOk.length}✓</div><div class="an-label">Bebidas</div></div>
+      <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍺</div><div class="an-sub">B: ${cMissing.length}⚠ ${cOk.length}✓</div><div class="an-label">Cervejas</div></div>
+    </div>`;
+  } else {
+    html+=`
+    <div class="analytics-grid" style="grid-template-columns:repeat(1,1fr);margin-bottom:18px">
+      <div class="an-card"><div class="an-num" style="color:var(--amber);font-size:20px">🍔</div><div class="an-sub">B: ${aMissing.length}⚠ ${aOk.length}✓</div><div class="an-label">Alimentos</div></div>
+    </div>`;
+  }
 
   if(allMissing.length){
     html+=`<div class="an-section"><div class="an-section-title red">🚨 Falta — ${allMissing.length} iten${allMissing.length!==1?'s':''}</div>`;
@@ -2817,10 +2859,10 @@ function buildAnalyticsBody() {
   }
   if(allOk.length){
     html+=`<div class="an-section"><div class="an-section-title muted">✅ OK — ${allOk.length} iten${allOk.length!==1?'s':''}</div>`;
-    const bGrp=allOk.filter(i=>i.src.includes('Bebidas'));
-    const cGrp=allOk.filter(i=>i.src.includes('Cervejas'));
-    const aGrp=allOk.filter(i=>i.src.includes('Alimentos'));
-    [['🥤 Bebidas',bGrp],['🍺 Cervejas',cGrp],['🍔 Alimentos',aGrp]].forEach(([lbl,grp])=>{
+    const groupsList = anGroup==='drinks'
+      ? [['🥤 Bebidas',bOk],['🍺 Cervejas',cOk]]
+      : [['🍔 Alimentos',aOk]];
+    groupsList.forEach(([lbl,grp])=>{
       if(!grp.length) return;
       html+=`<div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;padding:8px 0 4px;border-bottom:1px solid var(--border);margin-bottom:6px">${lbl}</div>`;
       grp.forEach(it=>{html+=`<div class="an-item-row" style="border-left:3px solid var(--green)"><div class="an-item-info"><div class="an-item-name">${it.nome}</div><div class="an-item-source">mín ${it.min}</div></div><div class="an-item-qty" style="color:var(--green)">${it.qty}</div></div>`;});
@@ -2843,36 +2885,40 @@ function exportPDFAnalytics() {
   const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
   const now = new Date().toLocaleString('pt-BR');
 
-  // Calcular todos os dados
-  const bStock={};
-  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{bStock[it.id]=0;weeks_n.forEach(w=>{bStock[it.id]+=bGetTotal(it.id,w);});}));
-  const cStock={};
-  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{cStock[it.id]=0;weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});}));
-  const aStock={};
-  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{aStock[item]=0;weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});}));
-
+  // Calcular dados do grupo ativo (Bebidas & Cervejas OU Alimentos)
   const allMissing=[],allOk=[];
-  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
-    const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
-    if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Bebidas'});
-    else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Bebidas'});
-  }));
-  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
-    const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
-    if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Cervejas'});
-    else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Cervejas'});
-  }));
-  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
-    const min=aGetMin(item);
-    if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
-    const qty=aStock[item],st=itemStatus(qty,min);
-    if(st==='missing') allMissing.push({nome:item,qty,min,falta:min-qty,src:'Alimentos'});
-    else if(st==='ok') allOk.push({nome:item,qty,min,src:'Alimentos'});
-  }));
+  if(anGroup==='drinks'){
+    const bStock={};
+    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{bStock[it.id]=0;weeks_n.forEach(w=>{bStock[it.id]+=bGetTotal(it.id,w);});}));
+    const cStock={};
+    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{cStock[it.id]=0;weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});}));
+    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+      const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
+      if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Bebidas'});
+      else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Bebidas'});
+    }));
+    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+      const qty=cStock[it.id],min=cGetMin(it.id),st=itemStatus(qty,min);
+      if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Cervejas'});
+      else if(st==='ok') allOk.push({nome:it.nome,qty,min,src:'Cervejas'});
+    }));
+  } else {
+    const aStock={};
+    CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{aStock[item]=0;weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});}));
+    CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+      const min=aGetMin(item);
+      if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
+      const qty=aStock[item],st=itemStatus(qty,min);
+      if(st==='missing') allMissing.push({nome:item,qty,min,falta:min-qty,src:'Alimentos'});
+      else if(st==='ok') allOk.push({nome:item,qty,min,src:'Alimentos'});
+    }));
+  }
+
+  const reportTitle = anGroup==='drinks' ? 'RELATÓRIO ANALYTICS — BEBIDAS & CERVEJAS' : 'RELATÓRIO ANALYTICS — ALIMENTOS';
 
   // Cabeçalho
   doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
-  doc.text('RELATÓRIO ANALYTICS — GERAL', margin, 11);
+  doc.text(reportTitle, margin, 11);
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
@@ -2912,7 +2958,7 @@ function exportPDFAnalytics() {
   if(allOk.length){
     sectionTitle('OK — ESTOQUE SUFICIENTE',50,50,50);
     // Agrupado por origem
-    const srcs=['Bebidas','Cervejas','Alimentos'];
+    const srcs = anGroup==='drinks' ? ['Bebidas','Cervejas'] : ['Alimentos'];
     const body=[];
     srcs.forEach(src=>{
       const grp=allOk.filter(i=>i.src===src); if(!grp.length) return;
@@ -2932,10 +2978,10 @@ function exportPDFAnalytics() {
   const pgCount=doc.getNumberOfPages();
   for(let i=1;i<=pgCount;i++){
     doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
-    doc.text('Black Skull Bier — Analytics Geral',margin,290);
+    doc.text(`Black Skull Bier — ${anGroup==='drinks'?'Bebidas & Cervejas':'Alimentos'}`,margin,290);
     doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
   }
-  doc.save(`analytics-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
+  doc.save(`analytics-${anGroup==='drinks'?'bebidas-cervejas':'alimentos'}-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
   showToast('PDF exportado ✓');
 }
 
@@ -2952,8 +2998,9 @@ function exportPDFAnalyticsSimples() {
   const weeks_a = anWeek==='all'?[0,1,2,3,4]:[anWeek-1];
   const now = new Date().toLocaleString('pt-BR');
 
+  const reportTitle = anGroup==='drinks' ? 'RELATÓRIO SIMPLIFICADO — BEBIDAS & CERVEJAS' : 'RELATÓRIO SIMPLIFICADO — ALIMENTOS';
   doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
-  doc.text('RELATÓRIO SIMPLIFICADO — TODAS AS CONTAGENS', margin, 11);
+  doc.text(reportTitle, margin, 11);
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
   doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
 
@@ -2979,44 +3026,46 @@ function exportPDFAnalyticsSimples() {
     y=doc.lastAutoTable.finalY+8;
   }
 
-  sectionTitle('🥤 BEBIDAS — TODOS OS ITENS');
-  const bBody=[];
-  CAT_BEBIDAS.forEach(cat=>{
-    bBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
-    cat.itens.forEach(it=>{
-      let qty=0; weeks_n.forEach(w=>{qty+=bGetTotal(it.id,w);});
-      const min=bGetMin(it.id),st=itemStatus(qty,min);
-      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
-      bBody.push([it.nome,String(qty),stL]);
+  if(anGroup==='drinks'){
+    sectionTitle('🥤 BEBIDAS — TODOS OS ITENS');
+    const bBody=[];
+    CAT_BEBIDAS.forEach(cat=>{
+      bBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+      cat.itens.forEach(it=>{
+        let qty=0; weeks_n.forEach(w=>{qty+=bGetTotal(it.id,w);});
+        const min=bGetMin(it.id),st=itemStatus(qty,min);
+        const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+        bBody.push([it.nome,String(qty),stL]);
+      });
     });
-  });
-  itemsTable(bBody);
+    itemsTable(bBody);
 
-  sectionTitle('🍺 CERVEJAS — TODOS OS ITENS');
-  const cBody=[];
-  CAT_CERVEJAS.forEach(cat=>{
-    cBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
-    cat.itens.forEach(it=>{
-      let qty=0; weeks_n.forEach(w=>{qty+=cGetTotal(it.id,w);});
-      const min=cGetMin(it.id),st=itemStatus(qty,min);
-      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
-      cBody.push([it.nome,String(qty),stL]);
+    sectionTitle('🍺 CERVEJAS — TODOS OS ITENS');
+    const cBody=[];
+    CAT_CERVEJAS.forEach(cat=>{
+      cBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+      cat.itens.forEach(it=>{
+        let qty=0; weeks_n.forEach(w=>{qty+=cGetTotal(it.id,w);});
+        const min=cGetMin(it.id),st=itemStatus(qty,min);
+        const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+        cBody.push([it.nome,String(qty),stL]);
+      });
     });
-  });
-  itemsTable(cBody);
-
-  sectionTitle('🍔 ALIMENTOS — TODOS OS ITENS');
-  const aBody=[];
-  CAT_ALIMENTOS.forEach(cat=>{
-    aBody.push([{content:cat.name,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
-    cat.items.forEach(item=>{
-      let qty=0; weeks_a.forEach(w=>{qty+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
-      const min=aGetMin(item),st=itemStatus(qty,min);
-      const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
-      aBody.push([item,String(qty),stL]);
+    itemsTable(cBody);
+  } else {
+    sectionTitle('🍔 ALIMENTOS — TODOS OS ITENS');
+    const aBody=[];
+    CAT_ALIMENTOS.forEach(cat=>{
+      aBody.push([{content:cat.name,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+      cat.items.forEach(item=>{
+        let qty=0; weeks_a.forEach(w=>{qty+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
+        const min=aGetMin(item),st=itemStatus(qty,min);
+        const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
+        aBody.push([item,String(qty),stL]);
+      });
     });
-  });
-  itemsTable(aBody);
+    itemsTable(aBody);
+  }
 
   const pgCount=doc.getNumberOfPages();
   for(let i=1;i<=pgCount;i++){
@@ -3024,7 +3073,95 @@ function exportPDFAnalyticsSimples() {
     doc.text('Black Skull Bier — Relatório Simplificado',margin,290);
     doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
   }
-  doc.save(`relatorio-simplificado-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
+  doc.save(`relatorio-simplificado-${anGroup==='drinks'?'bebidas-cervejas':'alimentos'}-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
+  showToast('PDF exportado ✓');
+}
+
+// Junta Bebidas + Cervejas num único relatório, agrupado por distribuidora
+// (campo configurável por categoria na aba Configurações). Categorias sem
+// distribuidora definida caem no grupo "Sem distribuidora", ao final.
+function exportPDFDistribuidora() {
+  showToast('Gerando PDF…');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW=210, margin=14, colW=pageW-margin*2;
+  const semLabel = anWeek==='all'?'Todas as Semanas':`${anWeek}ª Semana`;
+  const weeks_n = anWeek==='all'?[1,2,3,4,5]:[anWeek];
+  const now = new Date().toLocaleString('pt-BR');
+
+  const groups = {};
+  function addCats(cats, src, getTotal, getMin) {
+    cats.forEach(cat=>{
+      const dist = (cat.distribuidora||'').trim() || 'Sem distribuidora';
+      if (!groups[dist]) groups[dist]=[];
+      const itens = cat.itens.map(it=>{
+        let qty=0; weeks_n.forEach(w=>{qty+=getTotal(it.id,w);});
+        const min=getMin(it.id), st=itemStatus(qty,min);
+        return { nome: it.nome, qty, min, status: st };
+      });
+      if (itens.length) groups[dist].push({ catNome: cat.nome, src, itens });
+    });
+  }
+  addCats(CAT_BEBIDAS, 'BEBIDAS', bGetTotal, bGetMin);
+  addCats(CAT_CERVEJAS, 'CERVEJAS', cGetTotal, cGetMin);
+
+  const distNames = Object.keys(groups).sort((a,b)=>{
+    if (a==='Sem distribuidora') return 1;
+    if (b==='Sem distribuidora') return -1;
+    return a.localeCompare(b,'pt-BR');
+  });
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
+  doc.text('RELATÓRIO POR DISTRIBUIDORA — BEBIDAS & CERVEJAS', margin, 11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
+  doc.text(`${semLabel.toUpperCase()} • Gerado em ${now}`, margin, 18);
+
+  let y=30;
+  function sectionTitle(title,r,g,b){
+    if (y>265) { doc.addPage(); y=20; }
+    doc.setFillColor(r,g,b); doc.rect(margin,y,colW,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+    doc.text(title,margin+3,y+4.8); y+=9;
+  }
+
+  if (distNames.length===0) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120,120,120);
+    doc.text('Nenhum item cadastrado em Bebidas ou Cervejas.', margin, y+6);
+  }
+
+  distNames.forEach(dist=>{
+    sectionTitle(dist.toUpperCase(), 232,160,32);
+    const body=[];
+    groups[dist].forEach(cat=>{
+      body.push([{content:`${cat.src} · ${cat.catNome}`,colSpan:4,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
+      cat.itens.forEach(({nome,qty,min,status})=>{
+        const stL=status==='missing'?'falta':status==='ok'?'ok':'—';
+        body.push([nome,String(qty),min>0?String(min):'—',stL]);
+      });
+    });
+    doc.autoTable({startY:y,
+      head:[['Item','Qtd','Mínimo','Status']],
+      body, theme:'grid',
+      styles:{fontSize:8,cellPadding:2,textColor:[30,30,30],lineColor:[200,200,200],fillColor:[255,255,255]},
+      headStyles:{fillColor:[240,240,240],textColor:[80,80,80],fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{1:{halign:'center'},2:{halign:'center'},3:{halign:'center'}},
+      didParseCell:(d)=>{
+        if(d.section==='body'&&d.column.index===3){
+          if(d.cell.raw==='falta'){d.cell.styles.textColor=[210,60,60];d.cell.styles.fontStyle='bold';}
+          else if(d.cell.raw==='ok'){d.cell.styles.textColor=[60,160,90];}
+        }
+      },
+      margin:{left:margin,right:margin}});
+    y=doc.lastAutoTable.finalY+6;
+  });
+
+  const pgCount=doc.getNumberOfPages();
+  for(let i=1;i<=pgCount;i++){
+    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Black Skull Bier — Por Distribuidora',margin,290);
+    doc.text(`Pagina ${i} / ${pgCount}`,pageW-margin,290,{align:'right'});
+  }
+  doc.save(`distribuidora-${anWeek==='all'?'todas':anWeek+'sem'}-${pdfDateSuffix()}.pdf`);
   showToast('PDF exportado ✓');
 }
 
@@ -3288,16 +3425,23 @@ function buildConfigPage(type) {
     <button class="cfg-add-btn" onclick="addCfgCategory('${type}')">+ Categoria</button>`;
   page.appendChild(newCatRow);
 
+  const showDistrib = (type === 'bebidas' || type === 'cervejas');
+
   cats.forEach((cat, catIdx) => {
     const block = document.createElement('div');
     block.className = 'cfg-section-block';
     block.id = `cfg-cat-block-${type}-${catIdx}`;
 
+    const catNameId = `cfg-cat-name-${type}-${catIdx}`;
+    const distId = `cfg-cat-distrib-${type}-${catIdx}`;
     const header = document.createElement('div');
     header.className = 'cfg-section-header';
     header.innerHTML = `
-      <span>${cat[nameKey]}</span>
-      <button class="cfg-del-btn" title="Remover categoria" onclick="removeCfgCategory('${type}',${catIdx})" style="background:rgba(224,85,85,0.15);color:var(--red);border-radius:5px;border:none;padding:2px 8px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600">🗑 Remover cat.</button>`;
+      <div class="cfg-section-header-top">
+        <span class="cfg-cat-name" id="${catNameId}" onclick="editCfgCategoryName(this,'${type}',${catIdx})">${cat[nameKey]}</span>
+        <button class="cfg-del-btn" title="Remover categoria" onclick="removeCfgCategory('${type}',${catIdx})" style="background:rgba(224,85,85,0.15);color:var(--red);border-radius:5px;border:none;padding:2px 8px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;flex-shrink:0">🗑 Remover cat.</button>
+      </div>
+      ${showDistrib ? `<div class="cfg-cat-distrib" id="${distId}" onclick="editCfgDistribuidora(this,'${type}',${catIdx})">🚚 ${cat.distribuidora ? cat.distribuidora : '<span class="cfg-cat-distrib-empty">definir distribuidora</span>'}</div>` : ''}`;
     block.appendChild(header);
 
     const items = cat[itemsKey] || [];
@@ -3310,6 +3454,7 @@ function buildConfigPage(type) {
       row.dataset.type = type; row.dataset.cat = catIdx; row.dataset.idx = itIdx;
       const nameId = `cfg-item-name-${type}-${catIdx}-${itIdx}`;
       const codeId = `cfg-item-code-${type}-${catIdx}-${itIdx}`;
+      const moveWrapId = `cfg-move-${type}-${catIdx}-${itIdx}`;
       const nameField = type === 'alimentos'
         ? `<div class="cfg-item-name" id="${nameId}">${displayName}</div>`
         : `<div class="cfg-item-name" id="${nameId}">${displayName}</div>
@@ -3317,6 +3462,7 @@ function buildConfigPage(type) {
       row.innerHTML = `
         <div class="cfg-drag-handle">☰</div>
         <div style="flex:1;min-width:0">${nameField}</div>
+        <div class="cfg-move-wrap" id="${moveWrapId}">${cats.length>1 ? `<button class="cfg-move-btn" title="Mover para outra categoria" onclick="moveCfgItemUI('${moveWrapId}','${type}',${catIdx},${itIdx})">⇄</button>` : ''}</div>
         <button class="cfg-edit-btn" title="Editar" onclick="editCfgName(document.getElementById('${nameId}'),'${type}',${catIdx},${itIdx})">✎</button>
         <button class="cfg-del-btn" onclick="removeCfgItem('${type}',${catIdx},${itIdx})">✕</button>`;
       block.appendChild(row);
@@ -3345,8 +3491,8 @@ async function addCfgCategory(type) {
   const inp = document.getElementById(`cfg-new-cat-${type}`);
   const name = (inp?.value || '').trim();
   if (!name) { showToast('Digite o nome da categoria'); return; }
-  if (type === 'bebidas') CAT_BEBIDAS.push({ nome: name, itens: [] });
-  else if (type === 'cervejas') CAT_CERVEJAS.push({ nome: name, itens: [] });
+  if (type === 'bebidas') CAT_BEBIDAS.push({ nome: name, distribuidora: '', itens: [] });
+  else if (type === 'cervejas') CAT_CERVEJAS.push({ nome: name, distribuidora: '', itens: [] });
   else CAT_ALIMENTOS.push({ name: name, items: [] });
   inp.value = '';
   buildConfigPage(type);
@@ -3464,6 +3610,84 @@ function editCfgCode(el, type, catIdx, itIdx) {
   };
   inp.addEventListener('blur', commit);
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.removeEventListener('blur', commit); buildConfigPage(type); } });
+}
+
+// ─── Edição inline do nome da categoria ─────────────────────────────────────
+function editCfgCategoryName(el, type, catIdx) {
+  if (el.querySelector('input')) return;
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const nameKey = type === 'alimentos' ? 'name' : 'nome';
+  const cur = cats[catIdx][nameKey];
+  const inp = document.createElement('input');
+  inp.className = 'cfg-edit-input'; inp.value = cur;
+  el.textContent = ''; el.appendChild(inp);
+  inp.focus(); inp.select();
+  const commit = async () => {
+    const val = inp.value.trim();
+    if (val && val !== cur) {
+      cats[catIdx][nameKey] = val;
+      await saveCatalogConfig(type);
+      showToast('Categoria renomeada ✓');
+    }
+    buildConfigPage(type);
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.removeEventListener('blur', commit); buildConfigPage(type); } });
+}
+
+// ─── Edição inline da distribuidora da categoria (só Bebidas/Cervejas) ──────
+function editCfgDistribuidora(el, type, catIdx) {
+  if (el.querySelector('input')) return;
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : CAT_CERVEJAS;
+  const cur = cats[catIdx].distribuidora || '';
+  const inp = document.createElement('input');
+  inp.className = 'cfg-edit-input'; inp.value = cur; inp.placeholder = 'Nome da distribuidora';
+  el.textContent = ''; el.appendChild(inp);
+  inp.focus(); inp.select();
+  const commit = async () => {
+    const val = inp.value.trim();
+    if (val !== cur) {
+      cats[catIdx].distribuidora = val;
+      await saveCatalogConfig(type);
+      showToast('Distribuidora atualizada ✓');
+    }
+    buildConfigPage(type);
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.removeEventListener('blur', commit); buildConfigPage(type); } });
+}
+
+// ─── Mover item de uma categoria para outra ─────────────────────────────────
+function moveCfgItemUI(wrapId, type, catIdx, itIdx) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap || wrap.querySelector('select')) return;
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const nameKey = type === 'alimentos' ? 'name' : 'nome';
+  if (cats.length < 2) { showToast('Só existe uma categoria'); return; }
+  const sel = document.createElement('select');
+  sel.className = 'cfg-move-select';
+  sel.innerHTML = `<option value="">Mover p/…</option>` +
+    cats.map((c, ci) => ci === catIdx ? '' : `<option value="${ci}">${c[nameKey]}</option>`).join('');
+  wrap.innerHTML = ''; wrap.appendChild(sel);
+  sel.focus();
+  let moved = false;
+  sel.addEventListener('change', async () => {
+    if (sel.value === '') { buildConfigPage(type); return; }
+    moved = true;
+    await moveCfgItem(type, catIdx, itIdx, parseInt(sel.value));
+  });
+  sel.addEventListener('blur', () => { setTimeout(() => { if (!moved) buildConfigPage(type); }, 150); });
+}
+
+async function moveCfgItem(type, catIdx, itIdx, targetCatIdx) {
+  const cats = type === 'bebidas' ? CAT_BEBIDAS : type === 'cervejas' ? CAT_CERVEJAS : CAT_ALIMENTOS;
+  const itemsKey = type === 'alimentos' ? 'items' : 'itens';
+  const items = cats[catIdx][itemsKey];
+  const [moved] = items.splice(itIdx, 1);
+  cats[targetCatIdx][itemsKey].push(moved);
+  buildConfigPage(type);
+  showToast('Item movido de categoria ✓');
+  await saveCatalogConfig(type);
 }
 
 // Quando um código (id) de bebida/cerveja é alterado, migra os dados salvos (estoque, mínimos) para o novo id
