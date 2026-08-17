@@ -636,14 +636,9 @@ header {
     <div class="selector-hint">Escolha qual contagem realizar</div>
     <div class="app-grid">
       <div class="app-card" onclick="loadApp('bebidas')">
-        <div class="app-card-icon">🥤</div>
-        <div class="app-card-name">Bebidas</div>
-        <div class="app-card-desc">Refrigerantes, sucos, energéticos e mais</div>
-      </div>
-      <div class="app-card" onclick="loadApp('cervejas')">
-        <div class="app-card-icon">🍺</div>
-        <div class="app-card-name">Cervejas</div>
-        <div class="app-card-desc">Por local: estoque, piscina, bar, câmara</div>
+        <div class="app-card-icon">🥤🍺</div>
+        <div class="app-card-name">Bebidas & Cervejas</div>
+        <div class="app-card-desc">Refrigerantes, sucos, energéticos e cervejas — por local</div>
       </div>
       <div class="app-card" onclick="loadApp('alimentos')">
         <div class="app-card-icon">🍔</div>
@@ -695,20 +690,6 @@ header {
     <div class="modal-btns">
       <button class="modal-btn cancel" onclick="hideModal()">Cancelar</button>
       <button class="modal-btn confirm" onclick="clearWeek()">Zerar</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="foodModal" style="display:none" onclick="if(event.target===this)closeFoodModal()">
-  <div class="modal-box">
-    <div class="modal-item" id="food-modal-item"></div>
-    <div class="modal-current">Atual: <span id="food-modal-current"></span></div>
-    <div class="modal-label">Quantidade a somar:</div>
-    <input class="modal-input" id="food-modal-input" type="number" min="0" placeholder="0"
-      onkeydown="if(event.key==='Enter')confirmFoodModal()">
-    <div class="modal-food-btns">
-      <button class="modal-cancel" onclick="closeFoodModal()">Cancelar</button>
-      <button class="modal-confirm" onclick="confirmFoodModal()">+ Somar</button>
     </div>
   </div>
 </div>
@@ -1033,9 +1014,10 @@ async function handleLogout() {
 //   item_id      -> bebidas: id numérico (string)
 //                    cervejas: "<id>__<local>" (um registro por local) e também "<id>__total" não é usado
 //                              (o total é calculado somando os locais)
-//                    alimentos: nome do item (usado também como item_id)
+//                    alimentos: "<nome>__<local>" (um registro por local — Cozinha 1 / Cozinha 2;
+//                              o total é calculado somando os locais); em Minimos, item_id = nome do item
 //   item_name    -> nome de exibição do item
-//   category_name-> nome da categoria (e para cervejas, também guarda o "local" no caso de Minimos não é necessário)
+//   category_name-> nome da categoria (e para cervejas/alimentos, também guarda o "local" — no caso de Minimos não é necessário)
 //   qty          -> quantidade
 //   min_qty      -> quantidade mínima (só relevante quando week_label = 'Minimos')
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1111,6 +1093,16 @@ async function fetchAllData() {
       if (parts[1]) bebLocPairs.add(`${r.week_label}__${parts[0]}`);
     }
   });
+  // Mesma lógica de pré-varredura, agora para alimentos (migração para
+  // Cozinha 1 / Cozinha 2): evita somar um registro antigo (sem "__local")
+  // em cima de um item/semana que já foi recontado no formato novo.
+  const alimLocPairs = new Set();
+  rows.forEach(r => {
+    if (r.app_type === 'alimentos' && r.week_label !== MIN_LABEL) {
+      const parts = String(r.item_id).split('__');
+      if (parts[1]) alimLocPairs.add(`${r.week_label}__${parts[0]}`);
+    }
+  });
 
   rows.forEach(r => {
     if (r.app_type === 'bebidas') {
@@ -1151,10 +1143,25 @@ async function fetchAllData() {
       }
     } else if (r.app_type === 'alimentos') {
       if (r.week_label === MIN_LABEL) {
-        newDB.alimentos.mins[r.item_name] = r.min_qty || 0;
+        // item_id pode ser apenas o nome (formato antigo) ou "nome__local" (novo, não usado em Minimos)
+        const baseName = String(r.item_id).split('__')[0];
+        newDB.alimentos.mins[r.item_name || baseName] = r.min_qty || 0;
       } else {
         const w = weekLabelToNum(r.week_label);
-        if (w) { const idx = w - 1; if (idx >= 0 && idx < 5) newDB.alimentos.counts[idx][r.item_name] = r.qty || 0; }
+        if (!w) return;
+        const idx = w - 1; if (idx < 0 || idx >= 5) return;
+        // item_id no formato "<nome>__<local>" (novo) ou apenas "<nome>" (antigo, total único)
+        const parts = String(r.item_id).split('__');
+        const name = parts[0];
+        const loc = parts[1] || null;
+        if (!newDB.alimentos.counts[idx][name]) newDB.alimentos.counts[idx][name] = _EMPTY_ALIM_LOCS();
+        if (loc) {
+          newDB.alimentos.counts[idx][name][loc] = r.qty || 0;
+        } else if (!alimLocPairs.has(`${r.week_label}__${name}`)) {
+          // compatibilidade: registro antigo (total único), migrado para Cozinha 1
+          // — só usado quando o item/semana nunca foi recontado no formato novo.
+          newDB.alimentos.counts[idx][name].cozinha1 = r.qty || 0;
+        }
       }
     }
   });
@@ -1284,6 +1291,37 @@ function cGetTotal(id, week) {
   const d = cGetItemData(id, week);
   return LOCAIS.reduce((s,l) => s + (d[l.id] || 0), 0);
 }
+// ─── Totais SEM "Comandas" (uso exclusivo nos PDFs de Resumo/Analytics) ────────
+// O local "Comandas" fica de fora da contagem exportada em PDF (relatório de
+// resumo, analytics e distribuidora), pois não representa estoque disponível.
+// A tela do app (Resumo/Analytics ao vivo) e o CSV continuam somando normal.
+const LOCAIS_SEM_COMANDAS = LOCAIS.filter(l => l.id !== 'comandas');
+function bGetTotalSemComandas(id, week) {
+  const d = bGetItemData(id, week);
+  return LOCAIS_SEM_COMANDAS.reduce((s,l) => s + (d[l.id] || 0), 0);
+}
+function cGetTotalSemComandas(id, week) {
+  const d = cGetItemData(id, week);
+  return LOCAIS_SEM_COMANDAS.reduce((s,l) => s + (d[l.id] || 0), 0);
+}
+function getResumoBebidasSemComandas() {
+  const stock={};
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
+    stock[it.id]=0;
+    weeks.forEach(w=>{ stock[it.id]+=bGetTotalSemComandas(it.id,w); });
+  }));
+  return stock;
+}
+function getResumoCervejasSemComandas() {
+  const stock={};
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    stock[it.id]=0;
+    weeks.forEach(w=>{ stock[it.id]+=cGetTotalSemComandas(it.id,w); });
+  }));
+  return stock;
+}
 // Salva TODOS os locais de um item (usado só quando o id do item muda —
 // renameItemIdInData). Os 6 upserts rodam em paralelo (Promise.all).
 async function cSetItemData(id, week, data) {
@@ -1340,18 +1378,33 @@ function findCervejaMeta(id) {
 }
 
 // ─── ALIMENTOS helpers ─────────────────────────────────────────────────────────
-function aGetCount(item, w) { return DB.alimentos.counts[w][item] || 0; }
-async function aSetCount(item, w, val) {
-  const v = Math.max(0, val);
-  DB.alimentos.counts[w][item] = v;
+// Separado por local — Cozinha 1 / Cozinha 2 — no mesmo padrão usado em Cervejas.
+const LOCAIS_ALIM = [
+  { id:'cozinha1', label:'Cozinha 1' }, { id:'cozinha2', label:'Cozinha 2' }
+];
+const _EMPTY_ALIM_LOCS = () => ({cozinha1:0,cozinha2:0});
+function aGetItemData(item, w) { return DB.alimentos.counts[w][item] || _EMPTY_ALIM_LOCS(); }
+function aGetTotal(item, w) {
+  const d = aGetItemData(item, w);
+  return LOCAIS_ALIM.reduce((s,l) => s + (d[l.id] || 0), 0);
+}
+// Mantido por compatibilidade — usado em vários lugares (resumo, CSV, PDF,
+// analytics) como "a contagem total do item na semana".
+function aGetCount(item, w) { return aGetTotal(item, w); }
+// Salva SÓ o local que mudou (1 upsert em vez de 2) — usado a cada toque
+// em +/- na tela de contagem.
+async function aSetLoc(item, w, loc, qty) {
+  if (!DB.alimentos.counts[w][item]) DB.alimentos.counts[w][item] = _EMPTY_ALIM_LOCS();
+  DB.alimentos.counts[w][item][loc] = qty;
   const meta = findAlimentoMeta(item);
+  const locInfo = LOCAIS_ALIM.find(l => l.id === loc);
   await upsertRecord({
     app_type: 'alimentos',
     week_label: WEEK_LABELS[w+1],
-    item_id: item,
+    item_id: `${item}__${loc}`,
     item_name: item,
-    category_name: meta.cat,
-    qty: v
+    category_name: `${meta.cat} · ${locInfo ? locInfo.label : loc}`,
+    qty
   });
 }
 function aGetMin(item) { return DB.alimentos.mins[item] || 0; }
@@ -1449,7 +1502,7 @@ async function loadApp(app) {
   const tabBar = document.getElementById('tabBar');
 
   if (app === 'bebidas') {
-    document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Bebidas</span>';
+    document.getElementById('app-logo').innerHTML = 'Black Skull Bier<span>Bebidas & Cervejas</span>';
     weekBar.style.display = 'flex';
     tabBar.innerHTML = `
       <button class="tab-btn active" onclick="setTab('contar')">📦 Contar</button>
@@ -1471,6 +1524,7 @@ async function loadApp(app) {
     weekBar.style.display = 'none';
     tabBar.innerHTML = `
       <button class="tab-btn active" onclick="setFoodTab('contagem')">📦 Contar</button>
+      <button class="tab-btn" onclick="setFoodTab('mover')">🔀 Mover</button>
       <button class="tab-btn" onclick="setFoodTab('resumo')">📊 Resumo</button>
       <button class="tab-btn" onclick="setFoodTab('config')">⚙️ Mínimos</button>`;
     document.getElementById('appContent').innerHTML = buildFoodHTML();
@@ -1502,17 +1556,24 @@ async function loadApp(app) {
 function renderBebidas() {
   document.getElementById('appContent').innerHTML = `
     <div class="main" id="tab-contar">
-      <div class="search-wrap"><input class="search-input" id="searchInput" type="search" placeholder="🔍 Buscar bebida…" oninput="renderContarBebidas()"></div>
+      <div class="search-wrap"><input class="search-input" id="searchInput" type="search" placeholder="🔍 Buscar bebida ou cerveja…" oninput="renderContarBebidas()"></div>
       <div id="contarList" style="padding:0 10px;display:flex;flex-direction:column;gap:6px"></div>
       <div style="height:80px"></div>
     </div>
     <div class="main no-weekbar" id="tab-resumo" style="display:none">
       <div class="resumo-wrap">
         <div class="week-select-wrap" id="resumoWeekBar"></div>
+        <div class="section-title" style="margin:0 0 4px">🥤 Bebidas</div>
         <div class="action-btns">
           <button class="action-btn" onclick="exportCSVBebidas()">⬇ CSV</button>
           <button class="action-btn" onclick="exportPDFBebidas()">📄 PDF</button>
           <button class="action-btn" onclick="exportPDFBebidasSimples()">📋 Simples</button>
+        </div>
+        <div class="section-title" style="margin:10px 0 4px">🍺 Cervejas</div>
+        <div class="action-btns">
+          <button class="action-btn" onclick="exportCSVCervejas()">⬇ CSV</button>
+          <button class="action-btn" onclick="exportPDFCervejas()">📄 PDF</button>
+          <button class="action-btn" onclick="exportPDFCervejasSimples()">📋 Simples</button>
         </div>
         <div class="status-cards" style="grid-template-columns:repeat(2,1fr)">
           <div class="status-card missing"><div class="sc-num" id="sc-missing">0</div><div class="sc-label">Falta</div></div>
@@ -1522,7 +1583,7 @@ function renderBebidas() {
       </div>
     </div>
     <div class="main no-weekbar" id="tab-minimos" style="display:none">
-      <div class="search-wrap"><input class="search-input" id="searchMin" type="search" placeholder="🔍 Buscar bebida…" oninput="renderMinimosBebidas()"></div>
+      <div class="search-wrap"><input class="search-input" id="searchMin" type="search" placeholder="🔍 Buscar bebida ou cerveja…" oninput="renderMinimosBebidas()"></div>
       <div class="min-list" id="minimosList"></div>
     </div>`;
   document.getElementById('weekBar').style.display = 'flex';
@@ -1562,11 +1623,11 @@ const bebExpanded = {};
 
 function renderContarBebidas() {
   const q = (document.getElementById('searchInput')?.value||'').toLowerCase().trim();
-  let html='';
+  let htmlB='';
   CAT_BEBIDAS.forEach(cat => {
     const items = cat.itens.filter(it => !q || it.nome.toLowerCase().includes(q) || String(it.id).includes(q));
     if (!items.length) return;
-    html += `<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div>`;
+    htmlB += `<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div>`;
     items.forEach(it => {
       const total = bGetTotal(it.id, currentWeek);
       const min = bGetMin(it.id);
@@ -1583,7 +1644,7 @@ function renderContarBebidas() {
             <button class="loc-btn plus" onclick="openPopover(event,'${it.id}','plus','b','${loc.id}')">+</button>
           </div></div>`;
       }).join('');
-      html+=`<div class="item-card-beer ${cls}" id="card-${it.id}">
+      htmlB+=`<div class="item-card-beer ${cls}" id="card-${it.id}">
         <div class="item-top">
           <div class="item-name-wrap" onclick="openPopover(event,'${it.id}','plus','b','estoque')" style="flex:1;min-width:0;cursor:pointer">
             <div class="item-name-beer">${it.nome}</div>
@@ -1606,6 +1667,53 @@ function renderContarBebidas() {
       </div>`;
     });
   });
+
+  let htmlC='';
+  CAT_CERVEJAS.forEach(cat=>{
+    const items=cat.itens.filter(it=>!q||it.nome.toLowerCase().includes(q)||String(it.id).includes(q));
+    if(!items.length) return;
+    htmlC+=`<div class="cat-header">${cat.nome}<span class="cat-count">${items.length}</span></div>`;
+    items.forEach(it=>{
+      const total=cGetTotal(it.id,currentWeek),min=cGetMin(it.id),st=itemStatus(total,min);
+      const cls=st==='missing'?'critical':total>0?'has-qty':'';
+      const isExp=beerExpanded[it.id]||false;
+      const locData=cGetItemData(it.id,currentWeek);
+      let locHtml=LOCAIS.map(loc=>{
+        const lq=locData[loc.id]||0;
+        return `<div class="loc-item"><span class="loc-label">${loc.label}</span>
+          <div class="loc-ctrl">
+            <button class="loc-btn minus" onclick="openPopover(event,'${it.id}','minus','c','${loc.id}')">−</button>
+            <span class="loc-qty ${lq===0?'zero':''}" id="lq-${it.id}-${loc.id}">${lq}</span>
+            <button class="loc-btn plus" onclick="openPopover(event,'${it.id}','plus','c','${loc.id}')">+</button>
+          </div></div>`;
+      }).join('');
+      htmlC+=`<div class="item-card-beer ${cls}" id="card-${it.id}">
+        <div class="item-top">
+          <div class="item-name-wrap" onclick="openPopover(event,'${it.id}','plus','c','estoque')" style="flex:1;min-width:0;cursor:pointer">
+            <div class="item-name-beer">${it.nome}</div>
+            <div class="item-sub">Toque para +1 no Estoque</div>
+          </div>
+          ${min>0?`<span class="min-badge">mín ${min}</span>`:''}
+          <div class="counter-ctrl">
+            <button class="btn-adj btn-minus" onclick="openPopover(event,'${it.id}','minus','c','total')">−</button>
+            <div class="qty-display-beer ${total===0?'zero':''}" id="qty-${it.id}">${total}</div>
+            <button class="btn-adj btn-plus" onclick="openPopover(event,'${it.id}','plus','c','total')">+</button>
+          </div>
+        </div>
+        <button class="toggle-loc" onclick="toggleLoc('${it.id}')">
+          <span id="tog-icon-${it.id}">${isExp?'▲':'▼'}</span>
+          <span id="tog-txt-${it.id}">${isExp?'Ocultar locais':'Ver por local'}</span>
+        </button>
+        <div class="loc-details ${isExp?'':'hidden'}" id="locs-${it.id}">
+          <div class="loc-grid" style="margin-top:6px">${locHtml}</div>
+        </div>
+      </div>`;
+    });
+  });
+
+  let html='';
+  if (htmlB) html += `<div class="section-title" style="margin:2px 0 4px">🥤 BEBIDAS</div>` + htmlB;
+  if (htmlC) html += `<div class="section-title" style="margin:14px 0 4px">🍺 CERVEJAS</div>` + htmlC;
   if (!html) html=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Nenhum item encontrado</div></div>`;
   document.getElementById('contarList').innerHTML = html;
 }
@@ -1643,12 +1751,19 @@ function renderResumoBebidas() {
     });
   }
   const stock = getResumoBebidas();
+  const stockC = getResumoCervejas();
   const missing=[],ok=[],zerados=[];
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
     if(st==='missing') missing.push({...it,qty,min,cat:cat.nome});
     else if(st==='ok') ok.push({...it,qty,min,cat:cat.nome});
     else if(qty===0) zerados.push({...it,qty,min,cat:cat.nome});
+  }));
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    const qty=stockC[it.id]||0,min=cGetMin(it.id),st=itemStatus(qty,min);
+    if(st==='missing') missing.push({...it,qty,min,cat:`🍺 ${cat.nome}`});
+    else if(st==='ok') ok.push({...it,qty,min,cat:`🍺 ${cat.nome}`});
+    else if(qty===0) zerados.push({...it,qty,min,cat:`🍺 ${cat.nome}`});
   }));
   const scM=document.getElementById('sc-missing');if(scM) scM.textContent=missing.length;
   const scO=document.getElementById('sc-ok');if(scO) scO.textContent=ok.length;
@@ -1666,13 +1781,11 @@ function renderResumoBebidas() {
     html+='</div>';
   }
   if(ok.length){
-    html+=`<div class="section-title full">✅ Contagem Completa — ${semLabel}</div><table class="full-table"><thead><tr><th>Cód.</th><th>Bebida</th><th>Qtd</th><th>Mín</th><th>Status</th></tr></thead><tbody>`;
+    html+=`<div class="section-title full">✅ Contagem Completa — ${semLabel}</div><table class="full-table"><thead><tr><th>Cód.</th><th>Item</th><th>Qtd</th><th>Mín</th><th>Status</th></tr></thead><tbody>`;
     let lastCat='';
-    const allItems=CAT_BEBIDAS.flatMap(cat=>cat.itens.filter(it=>ok.find(o=>o.id===it.id)).map(it=>({...it,cat:cat.nome})));
-    allItems.forEach(it=>{
+    ok.forEach(it=>{
       if(it.cat!==lastCat){html+=`<tr class="cat-row"><td colspan="5">${it.cat}</td></tr>`;lastCat=it.cat;}
-      const qty=stock[it.id]||0,min=bGetMin(it.id),st=itemStatus(qty,min);
-      html+=`<tr><td style="color:var(--text-muted);font-size:10px">#${it.id}</td><td>${it.nome}</td><td><b>${qty}</b></td><td>${min||'—'}</td><td><span class="status-badge ${st}">${st==='ok'?'OK':'—'}</span></td></tr>`;
+      html+=`<tr><td style="color:var(--text-muted);font-size:10px">#${it.id}</td><td>${it.nome}</td><td><b>${it.qty}</b></td><td>${it.min||'—'}</td><td><span class="status-badge ok">OK</span></td></tr>`;
     });
     html+='</tbody></table>';
   }
@@ -1685,6 +1798,16 @@ function getResumoBebidas() {
   CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
     stock[it.id]=0;
     weeks.forEach(w=>{ stock[it.id]+=bGetTotal(it.id,w); });
+  }));
+  return stock;
+}
+
+function getResumoCervejas() {
+  const stock={};
+  const weeks = resumoWeek==='all'?[1,2,3,4,5]:[resumoWeek];
+  CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
+    stock[it.id]=0;
+    weeks.forEach(w=>{ stock[it.id]+=cGetTotal(it.id,w); });
   }));
   return stock;
 }
@@ -1704,6 +1827,22 @@ function renderMinimosBebidas() {
           <button class="btn-adj btn-minus" onclick="adjMinBebida(${it.id},-1)">−</button>
           <input class="min-input ${min===0?'zero':''}" id="min-${it.id}" type="number" min="0" value="${min}" oninput="saveMinBebida(${it.id},this)">
           <button class="btn-adj btn-plus" onclick="adjMinBebida(${it.id},1)">+</button>
+        </div>
+      </div>`;
+    });
+  });
+  CAT_CERVEJAS.forEach(cat=>{
+    const items=cat.itens.filter(it=>!q||it.nome.toLowerCase().includes(q));
+    if(!items.length) return;
+    html+=`<div class="cat-header" style="margin:0 -10px;padding:14px 22px 6px">🍺 ${cat.nome}</div>`;
+    items.forEach(it=>{
+      const min=cGetMin(it.id);
+      html+=`<div class="min-item">
+        <div class="min-name"><div class="min-name-text">${it.nome}</div></div>
+        <div class="min-ctrl">
+          <button class="btn-adj btn-minus" onclick="adjMinCerveja('${it.id}',-1)">−</button>
+          <input class="min-input ${min===0?'zero':''}" id="cmin-${it.id}" type="number" min="0" value="${min}" oninput="saveMinCerveja('${it.id}',this)">
+          <button class="btn-adj btn-plus" onclick="adjMinCerveja('${it.id}',1)">+</button>
         </div>
       </div>`;
     });
@@ -1738,7 +1877,7 @@ function exportPDFBebidas() {
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const pageW=210, margin=14, colW=pageW-margin*2;
   const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
-  const stock = getResumoBebidas();
+  const stock = getResumoBebidasSemComandas();
   const now = new Date().toLocaleString('pt-BR');
 
   // Calcular cards
@@ -1843,7 +1982,7 @@ function exportPDFBebidasSimples() {
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const pageW=210, margin=14, colW=pageW-margin*2;
   const semLabel = resumoWeek==='all'?'Todas as Semanas':`${resumoWeek}ª Semana`;
-  const stock = getResumoBebidas();
+  const stock = getResumoBebidasSemComandas();
   const now = new Date().toLocaleString('pt-BR');
 
   doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
@@ -2098,7 +2237,7 @@ function exportPDFCervejas() {
   const missing=[],okList=[];
   let totalQty=0;
   CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{
-    const total=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+    const total=weeks.reduce((s,w)=>s+cGetTotalSemComandas(it.id,w),0);
     totalQty+=total;
     const min=cGetMin(it.id),st=itemStatus(total,min);
     const d=_EMPTY_LOCS();
@@ -2155,7 +2294,7 @@ function exportPDFCervejas() {
   CAT_CERVEJAS.forEach(cat=>{
     body.push([{content:cat.nome,colSpan:9,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.itens.forEach(it=>{
-      const total=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+      const total=weeks.reduce((s,w)=>s+cGetTotalSemComandas(it.id,w),0);
       const d=_EMPTY_LOCS();
       weeks.forEach(w=>{const dd=cGetItemData(it.id,w);LOCAIS.forEach(l=>{d[l.id]=(d[l.id]||0)+(dd[l.id]||0);});});
       const min=cGetMin(it.id),st=itemStatus(total,min);
@@ -2218,7 +2357,7 @@ function exportPDFCervejasSimples() {
   CAT_CERVEJAS.forEach(cat=>{
     body.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
     cat.itens.forEach(it=>{
-      const qty=weeks.reduce((s,w)=>s+cGetTotal(it.id,w),0);
+      const qty=weeks.reduce((s,w)=>s+cGetTotalSemComandas(it.id,w),0);
       totalQty+=qty;
       const min=cGetMin(it.id),st=itemStatus(qty,min);
       const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
@@ -2261,11 +2400,17 @@ function buildFoodHTML() {
   return `
   <div style="padding-top:100px">
   <div id="food-week-bar" style="padding:10px 16px;display:flex;align-items:center;gap:8px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface)"></div>
-  <div style="padding:10px 16px 4px;background:var(--surface);border-bottom:1px solid var(--border)">
-    <input class="search-input" id="food-search" type="search" placeholder="🔍 Buscar item…" oninput="filterFoodItems(this.value)">
+  <div id="food-search-wrap" style="padding:10px 16px 4px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <input class="search-input" id="food-search" type="search" placeholder="🔍 Buscar item…" oninput="buildFoodItems()">
   </div>
   <div id="food-page-contagem" style="display:block">
     <div style="padding:14px 16px 80px" id="food-items-container"></div>
+  </div>
+  <div id="food-page-mover" style="display:none">
+    <div style="padding:10px 16px 4px">
+      <input class="search-input" id="food-mover-search" type="search" placeholder="🔍 Buscar item…" oninput="buildFoodMover()">
+    </div>
+    <div style="padding:10px 16px 80px" id="food-mover-container"></div>
   </div>
   <div id="food-page-resumo" style="display:none">
     <div style="padding:14px 16px 80px">
@@ -2306,133 +2451,215 @@ function buildFoodWeekBar() {
 
 function setFoodTab(tab) {
   foodActiveTab=tab;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===['contagem','resumo','config'].indexOf(tab)));
-  ['contagem','resumo','config'].forEach(t=>{
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===['contagem','mover','resumo','config'].indexOf(tab)));
+  ['contagem','mover','resumo','config'].forEach(t=>{
     const el=document.getElementById(`food-page-${t}`);if(el) el.style.display=t===tab?'block':'none';
   });
   const wb=document.getElementById('food-week-bar');
   const fab=document.getElementById('fabClear');
+  const sw=document.getElementById('food-search-wrap');
   if(wb) wb.style.display=(tab==='config'||tab==='resumo')?'none':'';
-  if(fab) fab.style.display=tab==='config'?'none':'flex';
+  if(fab) fab.style.display=(tab==='config'||tab==='mover')?'none':'flex';
+  if(sw) sw.style.display=tab==='contagem'?'':'none';
+  if(tab==='contagem') buildFoodItems();
   if(tab==='resumo') buildFoodResumo();
   if(tab==='config') buildFoodConfig();
+  if(tab==='mover') buildFoodMover();
 }
 
 function setFoodWeek(w,btn) {
   foodCurrentWeek=w;
   document.querySelectorAll('#food-week-bar .week-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  refreshFoodDisplays();
+  if(foodActiveTab==='mover') buildFoodMover(); else buildFoodItems();
 }
+
+// Escapa aspas simples para uso seguro dentro de atributos onclick="...('...')"
+function escJs(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+const foodExpanded = {};
 
 function buildFoodItems() {
   const c=document.getElementById('food-items-container');if(!c)return;
-  c.innerHTML='';
+  const q=(document.getElementById('food-search')?.value||'').toLowerCase().trim();
+  let html='';
   CAT_ALIMENTOS.forEach(cat=>{
-    const sec=document.createElement('div');sec.className='category-section';
-    const h=document.createElement('div');h.className='category-header-food';h.textContent=cat.name;sec.appendChild(h);
-    cat.items.forEach(item=>{
-      const row=document.createElement('div');row.className='item-row';row.dataset.item=item.toLowerCase();
-      const name=document.createElement('div');name.className='item-row-name';name.textContent=item;
-      const badge=document.createElement('div');badge.className='item-min-badge';badge.id='fb-'+encodeURIComponent(item);
-      const ctrl=document.createElement('div');ctrl.className='counter-controls';
-      const minus=document.createElement('button');minus.className='btn-adj btn-minus';minus.textContent='−';
-      const display=document.createElement('input');display.type='number';display.min='0';
-      display.className='count-display zero';display.value='0';display.id='fcnt-'+encodeURIComponent(item);
-      display.oninput=()=>{const nv=Math.max(0,parseInt(display.value)||0);aSetCount(item,foodCurrentWeek,nv);updateFoodRowStatus(item,row,nv);display.className='count-display'+(nv===0?' zero':'');};
-      display.onblur=()=>{display.value=aGetCount(item,foodCurrentWeek);};
-      const plus=document.createElement('button');plus.className='btn-adj btn-plus';plus.textContent='+';
-      minus.onclick=()=>changeFoodCount(item,-1,row,display);
-      plus.onclick=()=>openFoodModal(item,row,display);
-      name.onclick=()=>changeFoodCount(item,1,row,display);
-      ctrl.appendChild(minus);ctrl.appendChild(display);ctrl.appendChild(plus);
-      row.appendChild(name);row.appendChild(badge);row.appendChild(ctrl);sec.appendChild(row);
+    const items=cat.items.filter(item=>!q||item.toLowerCase().includes(q));
+    if(!items.length) return;
+    html+=`<div class="category-section"><div class="category-header-food">${cat.name}</div>`;
+    items.forEach(item=>{
+      const total=aGetTotal(item,foodCurrentWeek);
+      const min=aGetMin(item);
+      const st=itemStatus(total,min);
+      const cls=st==='missing'?'critical':total>0?'has-qty':'';
+      const isExp=foodExpanded[item]||false;
+      const eid=encodeURIComponent(item);
+      const ej=escJs(item);
+      const locData=aGetItemData(item,foodCurrentWeek);
+      const locHtml=LOCAIS_ALIM.map(loc=>{
+        const lq=locData[loc.id]||0;
+        return `<div class="loc-item"><span class="loc-label">${loc.label}</span>
+          <div class="loc-ctrl">
+            <button class="loc-btn minus" onclick="openPopover(event,'${ej}','minus','a','${loc.id}')">−</button>
+            <span class="loc-qty ${lq===0?'zero':''}" id="alq-${eid}-${loc.id}">${lq}</span>
+            <button class="loc-btn plus" onclick="openPopover(event,'${ej}','plus','a','${loc.id}')">+</button>
+          </div></div>`;
+      }).join('');
+      html+=`<div class="item-card-beer ${cls}" id="fcard-${eid}">
+        <div class="item-top">
+          <div class="item-name-wrap" style="flex:1;min-width:0">
+            <div class="item-name-beer">${item}</div>
+          </div>
+          ${min>0?`<span class="min-badge">mín ${min}</span>`:''}
+          <div class="counter-ctrl">
+            <button class="btn-adj btn-minus" onclick="openPopover(event,'${ej}','minus','a','total')">−</button>
+            <div class="qty-display-beer ${total===0?'zero':''}" id="fqty-${eid}">${total}</div>
+            <button class="btn-adj btn-plus" onclick="openPopover(event,'${ej}','plus','a','total')">+</button>
+          </div>
+        </div>
+        <button class="toggle-loc" onclick="toggleLocFood('${ej}')">
+          <span id="ftog-icon-${eid}">${isExp?'▲':'▼'}</span>
+          <span id="ftog-txt-${eid}">${isExp?'Ocultar locais':'Ver por local'}</span>
+        </button>
+        <div class="loc-details ${isExp?'':'hidden'}" id="flocs-${eid}">
+          <div class="loc-grid" style="margin-top:6px">${locHtml}</div>
+        </div>
+      </div>`;
     });
-    c.appendChild(sec);
+    html+=`</div>`;
   });
-  refreshFoodDisplays();
+  c.innerHTML = html || `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Nenhum item encontrado</div></div>`;
 }
 
-async function changeFoodCount(item,delta,row,display) {
-  const nv=Math.max(0,aGetCount(item,foodCurrentWeek)+delta);
-  // aSetCount atualiza DB.alimentos.counts em memória de forma síncrona antes
-  // do primeiro await — por isso a tela já pode atualizar antes de esperar o
-  // Supabase responder (atualização otimista de verdade).
-  const saved=aSetCount(item,foodCurrentWeek,nv);
-  display.value=nv;display.className='count-display'+(nv===0?' zero':'');
-  display.classList.add('bump');setTimeout(()=>display.classList.remove('bump'),200);
-  updateFoodRowStatus(item,row,nv);
+function toggleLocFood(item) {
+  foodExpanded[item]=!foodExpanded[item];
+  const eid=encodeURIComponent(item);
+  const det=document.getElementById(`flocs-${eid}`), icon=document.getElementById(`ftog-icon-${eid}`), txt=document.getElementById(`ftog-txt-${eid}`);
+  if(det) det.classList.toggle('hidden', !foodExpanded[item]);
+  if(icon) icon.textContent = foodExpanded[item]?'▲':'▼';
+  if(txt) txt.textContent = foodExpanded[item]?'Ocultar locais':'Ver por local';
+}
+
+function refreshCardAlimento(item) {
+  const total=aGetTotal(item,foodCurrentWeek),min=aGetMin(item),st=itemStatus(total,min);
+  const eid=encodeURIComponent(item);
+  const card=document.getElementById(`fcard-${eid}`);if(!card) return;
+  card.className=`item-card-beer ${st==='missing'?'critical':total>0?'has-qty':''}`;
+  const qd=document.getElementById(`fqty-${eid}`);if(qd){qd.textContent=total;qd.className=`qty-display-beer${total===0?' zero':''}`;}
+  LOCAIS_ALIM.forEach(loc=>{
+    const lq=(aGetItemData(item,foodCurrentWeek)[loc.id]||0);
+    const lel=document.getElementById(`alq-${eid}-${loc.id}`);if(lel){lel.textContent=lq;lel.className=`loc-qty${lq===0?' zero':''}`;}
+  });
+}
+
+function refreshFoodDisplays() { buildFoodItems(); }
+
+// ─ Mover Alimentos entre locais (Cozinha 1 / Cozinha 2) ────────────────────────
+// Aba separada da Contagem: só redistribui/reduz estoque por local, sem passar
+// pelo popover de +/-. Mover não altera o total do item (é uma transferência
+// interna); "Diminuir 1" reduz só aquele local (e, por consequência, o total).
+function buildFoodMover() {
+  const c=document.getElementById('food-mover-container');if(!c)return;
+  const q=(document.getElementById('food-mover-search')?.value||'').toLowerCase().trim();
+  let html='';
+  CAT_ALIMENTOS.forEach(cat=>{
+    const items=cat.items.filter(item=>!q||item.toLowerCase().includes(q));
+    if(!items.length) return;
+    html+=`<div class="category-section"><div class="category-header-food">${cat.name}</div>`;
+    items.forEach(item=>{
+      const eid=encodeURIComponent(item), ej=escJs(item);
+      const d=aGetItemData(item,foodCurrentWeek);
+      const c1=d.cozinha1||0, c2=d.cozinha2||0;
+      html+=`<div class="item-card-beer" id="mvcard-${eid}">
+        <div class="item-top">
+          <div class="item-name-wrap" style="flex:1;min-width:0"><div class="item-name-beer">${item}</div></div>
+          <div class="qty-display-beer ${(c1+c2)===0?'zero':''}" style="cursor:default">${c1+c2}</div>
+        </div>
+        <div class="loc-grid" style="margin-top:6px">
+          <div class="loc-item">
+            <span class="loc-label">Cozinha 1</span>
+            <div class="loc-ctrl">
+              <span class="loc-qty ${c1===0?'zero':''}" id="mvq-${eid}-cozinha1">${c1}</span>
+              <button class="loc-btn minus" onclick="quickDecFood('${ej}','cozinha1')">−1</button>
+            </div>
+          </div>
+          <div class="loc-item">
+            <span class="loc-label">Cozinha 2</span>
+            <div class="loc-ctrl">
+              <span class="loc-qty ${c2===0?'zero':''}" id="mvq-${eid}-cozinha2">${c2}</span>
+              <button class="loc-btn minus" onclick="quickDecFood('${ej}','cozinha2')">−1</button>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+          <input type="number" min="1" value="1" class="modal-input" id="mvin-${eid}"
+            style="width:56px;text-align:center;padding:6px 2px;font-size:13px">
+          <button class="action-btn" style="flex:none;padding:6px 10px;font-size:11px" onclick="moveFoodStock('${ej}','cozinha1','cozinha2')">1 → 2</button>
+          <button class="action-btn" style="flex:none;padding:6px 10px;font-size:11px" onclick="moveFoodStock('${ej}','cozinha2','cozinha1')">2 → 1</button>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+  });
+  c.innerHTML = html || `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Nenhum item encontrado</div></div>`;
+}
+
+function refreshMoverRow(item) {
+  const eid=encodeURIComponent(item);
+  const d=aGetItemData(item,foodCurrentWeek);
+  const c1=d.cozinha1||0, c2=d.cozinha2||0;
+  LOCAIS_ALIM.forEach(loc=>{
+    const el=document.getElementById(`mvq-${eid}-${loc.id}`);
+    if(el){ const v=d[loc.id]||0; el.textContent=v; el.className=`loc-qty${v===0?' zero':''}`; }
+  });
+  const card=document.getElementById(`mvcard-${eid}`);
+  const totalEl=card?.querySelector('.qty-display-beer');
+  if(totalEl){ totalEl.textContent=c1+c2; totalEl.className=`qty-display-beer${(c1+c2)===0?' zero':''}`; }
+}
+
+// Debounce leve por item+local (evita cliques duplos derrubando 2 de uma vez)
+const _MOVE_DEBOUNCE_MS = 600;
+let _moveLastAt = {};
+async function quickDecFood(item, loc) {
+  const key=`dec:${loc}:${item}`;
+  const now=Date.now();
+  if(now-(_moveLastAt[key]||0) < _MOVE_DEBOUNCE_MS) return;
+  _moveLastAt[key]=now;
+  const cur=(aGetItemData(item,foodCurrentWeek)[loc]||0);
+  if(cur<=0) return;
+  const nv=cur-1;
+  const saved=aSetLoc(item,foodCurrentWeek,loc,nv);
+  refreshMoverRow(item);
+  refreshCardAlimento(item);
   await saved;
 }
 
-function updateFoodRowStatus(item,row,qty) {
-  const min=aGetMin(item);
-  row.classList.toggle('has-count',qty>0);
-  row.classList.toggle('is-missing',(qty<=min&&min>0));
-  const b=document.getElementById('fb-'+encodeURIComponent(item));
-  if(b) b.textContent=aGetMin(item)>0?`mín ${aGetMin(item)}`:'';
-}
-
-function refreshFoodDisplays() {
-  CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
-    const el=document.getElementById('fcnt-'+encodeURIComponent(item));if(!el) return;
-    const v=aGetCount(item,foodCurrentWeek);el.value=v;el.className='count-display'+(v===0?' zero':'');
-    const row=el.closest('.item-row');if(row) updateFoodRowStatus(item,row,v);
-  }));
-}
-
-function filterFoodItems(q) {
-  q=q.toLowerCase().trim();
-  document.querySelectorAll('.item-row').forEach(r=>{r.style.display=(!q||r.dataset.item.includes(q))?'':'none';});
-  document.querySelectorAll('.category-section').forEach(s=>{s.style.display=[...s.querySelectorAll('.item-row')].some(r=>r.style.display!=='none')?'':'none';});
-}
-
-let _foodModalItem=null,_foodModalRow=null,_foodModalDisplay=null;
-function openFoodModal(item,row,display) {
-  _foodModalItem=item;_foodModalRow=row;_foodModalDisplay=display;
-  document.getElementById('food-modal-item').textContent=item;
-  document.getElementById('food-modal-current').textContent=aGetCount(item,foodCurrentWeek);
-  document.getElementById('food-modal-input').value='';
-  document.getElementById('foodModal').style.display='flex';
-  setTimeout(()=>document.getElementById('food-modal-input').focus(),50);
-}
-function closeFoodModal() { document.getElementById('foodModal').style.display='none'; _foodModalItem=null; }
-
-// Debounce de 10s por item (evita somas duplicadas em cliques repetidos/duplo toque)
-const _FOOD_DEBOUNCE_MS = 3000;
-let _foodLastConfirmAt = {}; // chave: nome do item -> timestamp
-let _foodConfirmInFlight = false; // trava de reentrância enquanto o modal está processando
-
-async function confirmFoodModal() {
-  if(!_foodModalItem) return;
-  if(_foodConfirmInFlight) return; // já está processando uma confirmação, ignora cliques extras
-
-  const item=_foodModalItem, row=_foodModalRow, display=_foodModalDisplay;
+async function moveFoodStock(item, fromLoc, toLoc) {
+  const eid=encodeURIComponent(item);
+  const key=`mv:${fromLoc}>${toLoc}:${item}`;
   const now=Date.now();
-  const last=_foodLastConfirmAt[item]||0;
-  if(now-last < _FOOD_DEBOUNCE_MS){
-    showToast(`Aguarde ${Math.ceil((_FOOD_DEBOUNCE_MS-(now-last))/1000)}s para somar este item novamente`);
-    closeFoodModal();
+  if(now-(_moveLastAt[key]||0) < _MOVE_DEBOUNCE_MS) return;
+  const inp=document.getElementById(`mvin-${eid}`);
+  const amt=Math.max(0,parseInt(inp?.value)||0);
+  if(amt<=0) return;
+  const data=aGetItemData(item,foodCurrentWeek);
+  const avail=data[fromLoc]||0;
+  const moveQty=Math.min(amt,avail);
+  if(moveQty<=0){
+    showToast(`Sem quantidade em ${LOCAIS_ALIM.find(l=>l.id===fromLoc)?.label||fromLoc} para mover`);
     return;
   }
-
-  const add=Math.max(0,parseInt(document.getElementById('food-modal-input').value)||0);
-  if(add<=0){ closeFoodModal(); return; }
-
-  _foodConfirmInFlight=true;
-  _foodLastConfirmAt[item]=now;
-  // Fecha o modal imediatamente (UI otimista) para que ele não fique "preso" aberto
-  // enquanto a chamada assíncrona de salvamento ainda está em andamento.
-  closeFoodModal();
-  try {
-    const nv=aGetCount(item,foodCurrentWeek)+add;
-    const saved=aSetCount(item,foodCurrentWeek,nv);
-    if(display){display.value=nv;display.className='count-display';}
-    if(row) updateFoodRowStatus(item,row,nv);
-    await saved;
-  } finally {
-    _foodConfirmInFlight=false;
-  }
+  _moveLastAt[key]=now;
+  const newFrom=avail-moveQty;
+  const newTo=(data[toLoc]||0)+moveQty;
+  // Move é uma transferência interna: total do item não muda, então a
+  // Contagem (e os relatórios) continuam intactos.
+  const savedFrom=aSetLoc(item,foodCurrentWeek,fromLoc,newFrom);
+  const savedTo=aSetLoc(item,foodCurrentWeek,toLoc,newTo);
+  refreshMoverRow(item);
+  refreshCardAlimento(item);
+  await Promise.all([savedFrom,savedTo]);
+  showToast(`${moveQty} movido(s): ${LOCAIS_ALIM.find(l=>l.id===fromLoc)?.label} → ${LOCAIS_ALIM.find(l=>l.id===toLoc)?.label}`);
 }
 
 function buildFoodResumo() {
@@ -2445,7 +2672,7 @@ function buildFoodResumo() {
     btn.onclick=()=>{foodResumoWeek=i;buildFoodResumo();};tabs.appendChild(btn);
   });
   const weeks=foodResumoWeek===5?[0,1,2,3,4]:[foodResumoWeek];
-  const agg={};weeks.forEach(w=>Object.entries(DB.alimentos.counts[w]).forEach(([item,val])=>{if(val>0) agg[item]=(agg[item]||0)+val;}));
+  const agg={};weeks.forEach(w=>Object.keys(DB.alimentos.counts[w]).forEach(item=>{const val=aGetTotal(item,w);if(val>0) agg[item]=(agg[item]||0)+val;}));
   const allWithMin=[];CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{if(aGetMin(item)>0) allWithMin.push(item);}));
   const missing=[];
   allWithMin.forEach(item=>{
@@ -2492,7 +2719,7 @@ function buildFoodResumo() {
 
 function exportCSVAlimentos() {
   const weeks=foodResumoWeek===5?[0,1,2,3,4]:[foodResumoWeek];
-  const agg={};weeks.forEach(w=>Object.entries(DB.alimentos.counts[w]).forEach(([item,val])=>{if(val>0) agg[item]=(agg[item]||0)+val;}));
+  const agg={};weeks.forEach(w=>Object.keys(DB.alimentos.counts[w]).forEach(item=>{const val=aGetTotal(item,w);if(val>0) agg[item]=(agg[item]||0)+val;}));
   const rows=[['Item','Categoria','Qtd','Mínimo','Status']];
   CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
     const qty=agg[item]||0,min=aGetMin(item),st=itemStatus(qty,min);
@@ -2515,7 +2742,7 @@ function exportPDFAlimentos() {
   const weeks = foodResumoWeek===5 ? [0,1,2,3,4] : [foodResumoWeek];
   const semLabel = foodResumoWeek===5 ? 'Todas as Semanas' : `${foodResumoWeek+1}ª Semana`;
   const agg = {};
-  weeks.forEach(w => Object.entries(DB.alimentos.counts[w]).forEach(([item,val]) => { if(val>0) agg[item]=(agg[item]||0)+val; }));
+  weeks.forEach(w => Object.keys(DB.alimentos.counts[w]).forEach(item => { const val=aGetTotal(item,w); if(val>0) agg[item]=(agg[item]||0)+val; }));
   const allWithMin = [];
   CAT_ALIMENTOS.forEach(cat => cat.items.forEach(item => { if(aGetMin(item)>0) allWithMin.push(item); }));
   const missing = [], okList = [];
@@ -2650,7 +2877,7 @@ function exportPDFAlimentosSimples() {
   const weeks = foodResumoWeek===5 ? [0,1,2,3,4] : [foodResumoWeek];
   const semLabel = foodResumoWeek===5 ? 'Todas as Semanas' : `${foodResumoWeek+1}ª Semana`;
   const agg = {};
-  weeks.forEach(w => Object.entries(DB.alimentos.counts[w]).forEach(([item,val]) => { if(val>0) agg[item]=(agg[item]||0)+val; }));
+  weeks.forEach(w => Object.keys(DB.alimentos.counts[w]).forEach(item => { const val=aGetTotal(item,w); if(val>0) agg[item]=(agg[item]||0)+val; }));
   const now = new Date().toLocaleString('pt-BR');
 
   doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(20,20,20);
@@ -2818,7 +3045,7 @@ function buildAnalyticsBody() {
   } else {
     const aStock={};
     CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
-      aStock[item]=0; weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
+      aStock[item]=0; weeks_a.forEach(w=>{aStock[item]+=aGetTotal(item,w);});
     }));
     CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
       const min=aGetMin(item);
@@ -2889,9 +3116,9 @@ function exportPDFAnalytics() {
   const allMissing=[],allOk=[];
   if(anGroup==='drinks'){
     const bStock={};
-    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{bStock[it.id]=0;weeks_n.forEach(w=>{bStock[it.id]+=bGetTotal(it.id,w);});}));
+    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{bStock[it.id]=0;weeks_n.forEach(w=>{bStock[it.id]+=bGetTotalSemComandas(it.id,w);});}));
     const cStock={};
-    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{cStock[it.id]=0;weeks_n.forEach(w=>{cStock[it.id]+=cGetTotal(it.id,w);});}));
+    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>{cStock[it.id]=0;weeks_n.forEach(w=>{cStock[it.id]+=cGetTotalSemComandas(it.id,w);});}));
     CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>{
       const qty=bStock[it.id],min=bGetMin(it.id),st=itemStatus(qty,min);
       if(st==='missing') allMissing.push({nome:it.nome,qty,min,falta:min-qty,src:'Bebidas'});
@@ -2904,7 +3131,7 @@ function exportPDFAnalytics() {
     }));
   } else {
     const aStock={};
-    CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{aStock[item]=0;weeks_a.forEach(w=>{aStock[item]+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});}));
+    CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{aStock[item]=0;weeks_a.forEach(w=>{aStock[item]+=aGetTotal(item,w);});}));
     CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
       const min=aGetMin(item);
       if(min<=0) return; // sem mínimo configurado: a aba Resumo de Alimentos também não classifica esses itens
@@ -3032,7 +3259,7 @@ function exportPDFAnalyticsSimples() {
     CAT_BEBIDAS.forEach(cat=>{
       bBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
       cat.itens.forEach(it=>{
-        let qty=0; weeks_n.forEach(w=>{qty+=bGetTotal(it.id,w);});
+        let qty=0; weeks_n.forEach(w=>{qty+=bGetTotalSemComandas(it.id,w);});
         const min=bGetMin(it.id),st=itemStatus(qty,min);
         const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
         bBody.push([it.nome,String(qty),stL]);
@@ -3045,7 +3272,7 @@ function exportPDFAnalyticsSimples() {
     CAT_CERVEJAS.forEach(cat=>{
       cBody.push([{content:cat.nome,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
       cat.itens.forEach(it=>{
-        let qty=0; weeks_n.forEach(w=>{qty+=cGetTotal(it.id,w);});
+        let qty=0; weeks_n.forEach(w=>{qty+=cGetTotalSemComandas(it.id,w);});
         const min=cGetMin(it.id),st=itemStatus(qty,min);
         const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
         cBody.push([it.nome,String(qty),stL]);
@@ -3058,7 +3285,7 @@ function exportPDFAnalyticsSimples() {
     CAT_ALIMENTOS.forEach(cat=>{
       aBody.push([{content:cat.name,colSpan:3,styles:{fillColor:[240,240,240],textColor:[80,80,80],fontStyle:'bold',fontSize:7.5}}]);
       cat.items.forEach(item=>{
-        let qty=0; weeks_a.forEach(w=>{qty+=(DB.alimentos.counts[w]&&DB.alimentos.counts[w][item])||0;});
+        let qty=0; weeks_a.forEach(w=>{qty+=aGetTotal(item,w);});
         const min=aGetMin(item),st=itemStatus(qty,min);
         const stL=st==='missing'?'falta':st==='ok'?'ok':'—';
         aBody.push([item,String(qty),stL]);
@@ -3102,8 +3329,8 @@ function exportPDFDistribuidora() {
       if (itens.length) groups[dist].push({ catNome: cat.nome, src, itens });
     });
   }
-  addCats(CAT_BEBIDAS, 'BEBIDAS', bGetTotal, bGetMin);
-  addCats(CAT_CERVEJAS, 'CERVEJAS', cGetTotal, cGetMin);
+  addCats(CAT_BEBIDAS, 'BEBIDAS', bGetTotalSemComandas, bGetMin);
+  addCats(CAT_CERVEJAS, 'CERVEJAS', cGetTotalSemComandas, cGetMin);
 
   const distNames = Object.keys(groups).sort((a,b)=>{
     if (a==='Sem distribuidora') return 1;
@@ -3178,7 +3405,8 @@ function openPopover(evt, id, mode, app, locTarget) {
   const confirm=document.getElementById('adjPopoverConfirm');
   const inp=document.getElementById('adjPopoverInput');
   let locLabel='Total';
-  if((app==='c'||app==='b')&&locTarget!=='total') locLabel=LOCAIS.find(l=>l.id===locTarget)?.label||locTarget;
+  if(app==='a'&&locTarget!=='total') locLabel=LOCAIS_ALIM.find(l=>l.id===locTarget)?.label||locTarget;
+  else if((app==='c'||app==='b')&&locTarget!=='total') locLabel=LOCAIS.find(l=>l.id===locTarget)?.label||locTarget;
   if(mode==='plus'){title.textContent=`Adicionar — ${locLabel}`;title.className='adj-popover-title plus';confirm.className='adj-popover-confirm plus';}
   else {title.textContent=`Subtrair — ${locLabel}`;title.className='adj-popover-title minus';confirm.className='adj-popover-confirm minus';}
   inp.value=1; pop.classList.add('show'); pop.style.transform='';
@@ -3220,8 +3448,8 @@ async function confirmAdj() {
   // Fecha o popover imediatamente (UI otimista) para que ele não fique "preso" aberto
   // enquanto a chamada assíncrona de salvamento ainda está em andamento.
   closePopover();
-  // Só o local afetado é salvo (1 upsert), não os 6 locais do item inteiro.
-  const loc = locTarget==='total' ? 'estoque' : locTarget;
+  // Só o local afetado é salvo (1 upsert), não os locais do item inteiro.
+  const loc = locTarget==='total' ? (app==='a' ? 'cozinha1' : 'estoque') : locTarget;
   try {
     if(app==='b'){
       const nv=Math.max(0,(bGetItemData(id,currentWeek)[loc]||0)+delta);
@@ -3235,6 +3463,11 @@ async function confirmAdj() {
       const nv=Math.max(0,(cGetItemData(id,currentWeek)[loc]||0)+delta);
       const saved=cSetLoc(id,currentWeek,loc,nv);
       refreshCardCerveja(id);
+      await saved;
+    } else if(app==='a') {
+      const nv=Math.max(0,(aGetItemData(id,foodCurrentWeek)[loc]||0)+delta);
+      const saved=aSetLoc(id,foodCurrentWeek,loc,nv);
+      refreshCardAlimento(id);
       await saved;
     }
   } finally {
@@ -3259,7 +3492,6 @@ document.addEventListener('click',(e)=>{
 document.addEventListener('keydown',(e)=>{
   if(e.key==='Enter'){
     if(document.getElementById('adjPopover').classList.contains('show')) confirmAdj();
-    if(document.getElementById('foodModal').style.display==='flex') confirmFoodModal();
   }
   if(e.key==='Escape'){closePopover();}
 });
@@ -3315,10 +3547,14 @@ async function clearWeek() {
     renderContarCervejas();
   } else if(currentApp==='alimentos'){
     DB.alimentos.counts[foodCurrentWeek]={};
-    const items = CAT_ALIMENTOS.flatMap(cat=>cat.items);
+    const itemIds=[];
+    CAT_ALIMENTOS.forEach(cat=>cat.items.forEach(item=>{
+      LOCAIS_ALIM.forEach(loc=>itemIds.push(`${item}__${loc.id}`));
+      itemIds.push(item); // formato antigo (total único), por segurança
+    }));
     await deleteRecordsOffline(`del:alimentos:${WEEK_LABELS[foodCurrentWeek+1]}`,
-      { user_id: currentUser.id, app_type: 'alimentos', week_label: WEEK_LABELS[foodCurrentWeek+1] }, 'item_id', items);
-    refreshFoodDisplays();
+      { user_id: currentUser.id, app_type: 'alimentos', week_label: WEEK_LABELS[foodCurrentWeek+1] }, 'item_id', itemIds);
+    if(foodActiveTab==='mover') buildFoodMover(); else refreshFoodDisplays();
   }
   showToast('Semana zerada ✓');
 }
@@ -3837,6 +4073,7 @@ function refreshCurrentView() {
     else if (currentTab==='minimos') renderMinimosCervejas();
   } else if (currentApp === 'alimentos') {
     if (foodActiveTab==='contagem') refreshFoodDisplays();
+    else if (foodActiveTab==='mover') buildFoodMover();
     else if (foodActiveTab==='resumo') buildFoodResumo();
     else if (foodActiveTab==='config') buildFoodConfig();
   } else if (currentApp === 'analytics') {
