@@ -3502,7 +3502,7 @@ document.addEventListener('keydown',(e)=>{
 function showClearModal() {
   let label;
   if(currentApp==='alimentos') label=`${foodCurrentWeek+1}ª semana de Alimentos`;
-  else label=`${currentWeek}ª semana de ${currentApp==='bebidas'?'Bebidas':'Cervejas'}`;
+  else label=`${currentWeek}ª semana de ${currentApp==='bebidas'?'Bebidas & Cervejas':'Cervejas'}`;
   document.getElementById('clearModalText').textContent=`Zerar todas as contagens da ${label}?`;
   document.getElementById('clearModal').classList.add('show');
 }
@@ -3530,12 +3530,22 @@ async function deleteRecordsOffline(key, match, idsField, ids) {
 async function clearWeek() {
   hideModal();
   if(currentApp==='bebidas'){
+    // Esta tela mostra Bebidas E Cervejas juntas (ver renderContarBebidas),
+    // então "Limpar semana" aqui precisa zerar os dois tipos de registro —
+    // antes só apagava 'bebidas', deixando as cervejas intactas.
     const week = currentWeek;
     DB.bebidas.stock[week]={};
-    const itemIds=[];
-    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>LOCAIS.forEach(loc=>itemIds.push(`${it.id}__${loc.id}`))));
-    await deleteRecordsOffline(`del:bebidas:${WEEK_LABELS[week]}`,
-      { user_id: currentUser.id, app_type: 'bebidas', week_label: WEEK_LABELS[week] }, 'item_id', itemIds);
+    DB.cervejas.stock[week]={};
+    const itemIdsBebidas=[];
+    CAT_BEBIDAS.forEach(cat=>cat.itens.forEach(it=>LOCAIS.forEach(loc=>itemIdsBebidas.push(`${it.id}__${loc.id}`))));
+    const itemIdsCervejas=[];
+    CAT_CERVEJAS.forEach(cat=>cat.itens.forEach(it=>LOCAIS.forEach(loc=>itemIdsCervejas.push(`${it.id}__${loc.id}`))));
+    await Promise.all([
+      deleteRecordsOffline(`del:bebidas:${WEEK_LABELS[week]}`,
+        { user_id: currentUser.id, app_type: 'bebidas', week_label: WEEK_LABELS[week] }, 'item_id', itemIdsBebidas),
+      deleteRecordsOffline(`del:cervejas:${WEEK_LABELS[week]}`,
+        { user_id: currentUser.id, app_type: 'cervejas', week_label: WEEK_LABELS[week] }, 'item_id', itemIdsCervejas)
+    ]);
     renderContarBebidas();
   } else if(currentApp==='cervejas'){
     const week = currentWeek;
